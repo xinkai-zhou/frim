@@ -1,4 +1,14 @@
 #' Create bins for regularly spaced functional data.
+#'
+#'
+#' @param argvals A vector containing locations of observations on the
+#' functional domain.
+#' @param bin_midpoints
+#' @param bin_len
+#' @param cyclic
+#'
+#' @export CreateBins
+#'
 CreateBins <- function(argvals, bin_midpoints, bin_len, cyclic = F){
   S <- length(argvals)
   bin_midpoints <- sort(bin_midpoints)
@@ -49,7 +59,7 @@ CreateBins <- function(argvals, bin_midpoints, bin_len, cyclic = F){
   return(bin.index)
 }
 
-# # Example 
+# # Example
 # argvals <- 1:20
 # bin_len <- 7
 # bin_midpoints <- c(1, 5, 10, 15)

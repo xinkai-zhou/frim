@@ -1,16 +1,16 @@
-#' Simulate longitudinal functional response data
+#' Simulate longitudinal functional data
 #'
-#' @param family distribution of longitudinal functional data, including "gaussian", "binomial", "poisson".
-#' @param I number of subjects.
-#' @param Jmean mean number of observations per subject.
-#' @param L number of grid points on the functional domain.
-#' @param beta_true true fixed effects functions.
-#'
-#' @importFrom funData eFun
+#' @param family Type of data to generate. Currently supports "gaussian", "binomial", and "poisson".
+#' @param I Number of subjects.
+#' @param Jmean Mean number of functions per subject.
+#' @param L Number of grid points on the functional domain.
+#' @param beta_true True fixed effects functions.
+#' @param orthonormal Logical. Whether eigenfunctions from level one should be orthogonal
+#' to those from level two.
 #'
 #' @export SimulateLFD
 #'
-#' @return a data frame containing generated predictors and longitudinal functional outcomes.
+#' @return A list containing the following elements:
 
 SimulateLFD <- function(
     family = "gaussian",
@@ -55,7 +55,7 @@ SimulateLFD <- function(
       seq(1, npc$level2, by = 1), function(k) sqrt(2) * cos(k * pi * times)
     )
   } else {
-    l2temp <- eFun(times, M = L, type = "Poly")
+    l2temp <- funData::eFun(times, M = L, type = "Poly")
     efunctions$level2 <- t(l2temp@X)
   }
 

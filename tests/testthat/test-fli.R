@@ -1,18 +1,16 @@
-test_that("fli runs", {
-  library(tidyverse)
-  library(lme4)
-  # library(fli)
+if(!stan_cmdstan_exists()) skip("Tests for fli() skipped because cmdstan is not available.")
 
-  cmdstanr::set_cmdstan_path("~/Documents/cmdstan/")
+test_that("fli runs", {
+  # cmdstanr::set_cmdstan_path("~/Documents/cmdstan/")
   set.seed(1)
   dsim <- SimulateLFD(I = 20, Jmean = 2, L = 40)
   dsim.Y <- data.frame(unclass(dsim$data$Y))
   dsim.long <- cbind(dplyr::select(dsim$data, id, visit, X), dsim.Y) %>%
-    pivot_longer(
+    dplyr::pivot_longer(
       cols = -c(id, visit, X),  # this only allows for one fixed effect variable
       names_to = "time", values_to = "Y"
     ) %>%
-    mutate(time = as.integer(gsub("X", "", time)))
+    dplyr::mutate(time = as.integer(gsub("X", "", time)))
 
   # formula = Y ~ X + (1|id) + (1|id:visit)
   # formula.fixef = ~ X

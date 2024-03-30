@@ -23,7 +23,7 @@
 #' @param argvals A vector containing locations of observations on the
 #' functional domain. If not specified, a regular grid across the range of
 #' the domain is assumed. Currently only supported for bootstrap (\code{analytic=FALSE}).
-#' @param smoothing.pars$nknots_min Minimal number of knots in the penalized smoothing for the regression coefficients.
+#' @param smoothing.pars.nknots_min Minimal number of knots in the penalized smoothing for the regression coefficients.
 #' Defaults to \code{NULL}, which then uses L/2 where L is the dimension of the functional domain.
 #' @param smoothing.pars$nknots_min_cov Minimal number of knots in the penalized smoothing for the covariance matrices.
 #' Defaults to \code{35}.
@@ -35,18 +35,12 @@
 #' @return A list containing:
 #' \item{...}{...}
 #'
-#' @author
-#'
 #' @references
 #'
-#' @export fli
-#'
 #' @import dplyr
-#' @import lme4
-#' @import parallel
-#' @import mgcv
-#' @import refund
 #' @import cmdstanr
+#'
+#' @export fli
 #'
 #' @examples
 #' set.seed(1)
@@ -155,7 +149,7 @@ fli <- function(
     cyclic = bin.pars$cyclic
   )
   # Count the number of visits per subject
-  nvisits <- data %>% summarise(
+  nvisits <- data %>% dplyr::summarise(
     nvisits = n_distinct(.data[[var.names$visit_name]]),
     .by = all_of(var.names$id_name)
   )
@@ -167,7 +161,7 @@ fli <- function(
   ###           Each element in the list is a vector containing domain points for that bin.
   ### Output: A list containing point estimates, variance estimates, etc.
   unimm <- function(l){
-    dtemp <- data %>% filter(.data[[var.names$domain_name]] %in% l)
+    dtemp <- data %>% dplyr::filter(.data[[var.names$domain_name]] %in% l)
     if(family == "gaussian"){
       fit_uni <- suppressMessages(
         lme4::lmer(
@@ -196,7 +190,7 @@ fli <- function(
         all_of(c(var.names$id_name, var.names$visit_name))
       ),
       model.matrix(fit_uni)
-    ) %>% distinct(
+    ) %>% dplyr::distinct(
     ) %>% dplyr::select(
       - all_of(c(var.names$id_name, var.names$visit_name))
     ) %>% as.matrix()
@@ -353,16 +347,23 @@ fli <- function(
 
   # standata <- jsonlite::read_json("results/sim/standata.json")
   # set_cmdstan_path(dir.path$cmdstan_installation_path)
-  stanmodel <- system.file(paste0("stanmodel-", family), package = "fli")
-  model_parallel <- cmdstanr::cmdstan_model(exe_file = stanmodel)
+  # stanmodel <- system.file(paste0("stanmodel-", family), package = "fli")
+  # model_parallel <- cmdstanr::cmdstan_model(exe_file = stanmodel)
   # if(file.exists(stanmodel)){
   # } else {
   #   model_parallel <-  cmdstan_model(
   #     stan_file = paste0(paste0(dir.path$stanfile_path, "stanmodel-", family), ".stan")
   #   )
   # }
+
+
+  # new way, using {instantiate}
+  stanmodel <- instantiate::stan_package_model(
+    name = paste0("stanmodel-", family), package = "fli"
+  )
+
   tic <- Sys.time()
-  stanfit <- model_parallel$sample(
+  stanfit <- stanmodel$sample(
     # data = paste0(res.path, "standata.json"),
     data = standata,
     iter_warmup = stan.pars$iter_warmup,
