@@ -1,7 +1,7 @@
 #' Fast Local Inference for Longitudinal Functional Models
 #'
 #'
-#' The FLI approach comprises of four steps:
+#' The FLI approach comprises of five steps:
 #' \enumerate{
 #' \item Divide the domain into bins;
 #' \item Fit a mixed model in each bin and obtain fixed effect estimates;
@@ -311,6 +311,17 @@ fli <- function(
     efunctions = mfpca.res$efunctions$level2[, 1:mfpca.pars$npc_l2],
     npc = mfpca.pars$npc_l2
   )
+
+  # Fix beta in sampling
+  betaHat.reeval <- reeval_efunctions(
+    knots = nknots,
+    argvals_bin = bin.pars$bin_midpoints,
+    argvals = argvals,
+    efunctions = t(betaHat),
+    npc = 2 # 2 fixed effects
+  )
+  betaHat.reeval <- t(betaHat.reeval)
+
   b0.mfpca <- reeval_efunctions(
     knots = nknots,
     argvals_bin = bin.pars$bin_midpoints,
@@ -333,6 +344,7 @@ fli <- function(
     X     = fixef.design.mx,
     nvisits   = nvisits$nvisits,
     beta_0    = b0.mfpca,
+    betaHat   = betaHat.reeval,
     efuncs_l1 = t(deigfun.l1.wide),
     efuncs_l2 = t(deigfun.l2.wide),
     grainsize = 1
@@ -381,15 +393,15 @@ fli <- function(
   # sigma.sq <- draws.df[, grep("sigma_epi_sq", colnames(draws.df))]
   # plot(sigma.sq$sigma_epi_sq, type = "l")
 
-  beta.posterior <- array(NA, c(ncol(fixef.design.mx), stan.pars$iter_sampling, length(argvals)))
-  for(i in 1:ncol(fixef.design.mx)){
-    # print(i)
-    for(k in 1:length(argvals)){
-      temp.varname <- paste0("beta[", i, ",", k, "]")
-      beta.posterior[i, , k] <- draws.df[[temp.varname]]
-    }
-  }
-  beta.post.mean <- apply(beta.posterior, c(1,3), mean)
+  # beta.posterior <- array(NA, c(ncol(fixef.design.mx), stan.pars$iter_sampling, length(argvals)))
+  # for(i in 1:ncol(fixef.design.mx)){
+  #   # print(i)
+  #   for(k in 1:length(argvals)){
+  #     temp.varname <- paste0("beta[", i, ",", k, "]")
+  #     beta.posterior[i, , k] <- draws.df[[temp.varname]]
+  #   }
+  # }
+  # beta.post.mean <- apply(beta.posterior, c(1,3), mean)
 
   l1score.posterior <- array(NA, c(standata$Nsubs, stan.pars$iter_sampling, mfpca.pars$npc_l1))
   for(i in 1:standata$Nsubs){
@@ -419,8 +431,8 @@ fli <- function(
       betaTilde = betaTilde,
       betaHat  = betaHat,
       betaSE   = betaSE,
-      beta_posterior = beta.posterior,
-      beta_post_mean = beta.post.mean,
+      # beta_posterior = beta.posterior,
+      # beta_post_mean = beta.post.mean,
       efunctions = list(
         level1 = deigfun.l1.wide,
         level2 = deigfun.l2.wide
