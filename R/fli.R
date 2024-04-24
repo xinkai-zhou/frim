@@ -226,6 +226,7 @@ fli <- function(
   betaTilde <- t(do.call(rbind, lapply(massmm, '[[', "betaTilde")))
   betaSE <- t(do.call(rbind, lapply(massmm, '[[', "se_mat")))
   colnames(betaTilde) <- names(bin.index)
+  p <- nrow(betaTilde)
 
   # Obtain residuals, AIC, BIC, and random effects estimates (analytic)
   ## AIC/BIC
@@ -318,7 +319,7 @@ fli <- function(
     argvals_bin = bin.pars$bin_midpoints,
     argvals = argvals,
     efunctions = t(betaHat),
-    npc = 2 # 2 fixed effects
+    npc = p # p fixed effects
   )
   betaHat.reeval <- t(betaHat.reeval)
 
@@ -339,7 +340,7 @@ fli <- function(
     L     = mfpca.pars$npc_l1,
     M     = mfpca.pars$npc_l2,
     ylen  = nrow(data),
-    p     = ncol(fixef.design.mx),
+    p     = p,
     y     = data[[model_formula[[2]]]],
     X     = fixef.design.mx,
     nvisits   = nvisits$nvisits,
