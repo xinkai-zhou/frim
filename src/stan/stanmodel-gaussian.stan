@@ -15,7 +15,7 @@ data {
   matrix[ylen, p]  X;   // design matrix for fixed effects
   array[Nsubs] int nvisits; // a vector of the number of repeated functions within individuals
   row_vector[S] beta_0;     // intercept function estimated from step 3
-  matrix[2,S]   betaHat;    // smoothed fixed effect estimates.
+  matrix[p,S]   betaHat;    // smoothed fixed effect estimates.
   matrix[L,S]   efuncs_l1;  // level 1 eigen functions
   matrix[M,S]   efuncs_l2;  // level 2 eigen functions
   int<lower=1>  grainsize;
