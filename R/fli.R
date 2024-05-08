@@ -432,6 +432,7 @@ fli <- function(
       betaTilde = betaTilde,
       betaHat  = betaHat,
       betaSE   = betaSE,
+      beta0_mfpca = b0.mfpca,
       # beta_posterior = beta.posterior,
       # beta_post_mean = beta.post.mean,
       efunctions = list(
