@@ -211,7 +211,8 @@ fli <- function(
     se_mat <- summary(fit_uni)$coefficients[, "Std. Error"] ## se of fixed effects
     model_matrix = dref %>%
       left_join(cbind(
-        dplyr::select(dtemp, all_of(c(var.names$id_name, var.names$visit_name))),
+        dplyr::select(dtemp, all_of(c(var.names$id_name, var.names$visit_name))) %>%
+          filter(!is.na(.data[[model_formula[[2]]]])),
         model.matrix(fit_uni)
       ), by = c(var.names$id_name, var.names$visit_name)) %>% dplyr::distinct() %>%
       dplyr::select(- all_of(c(var.names$id_name, var.names$visit_name))) %>%
