@@ -64,7 +64,7 @@ fli <- function(
       domain_name = "time"
     ),
     smoothing.pars = list(
-      nknots_min = NULL,
+      nknots_min = 35,
       smooth_method = "GCV.Cp",
       splines = "tp"
     ),
@@ -115,7 +115,19 @@ fli <- function(
     if(!file.exists(res.path)) dir.create(res.path)
   }
 
+  # Filter out NA in the data set
+  data <- filter(data, !is.na(.data[[model_formula[[2]]]]))
+  # Convert id and visit names to character for merging with random effect df later
+  data[[var.names$id_name]] <- as.character(data[[var.names$id_name]])
+  data[[var.names$visit_name]] <- as.character(data[[var.names$visit_name]])
 
+  # Get a reference data frame that contains the unique id and visit combo
+  # When local bins do not have data for a specific id-visit, the reference df
+  # will be used to mark the corresponding random effect as NA.
+  dref <- data %>%
+    dplyr::select(all_of(c(var.names$id_name, var.names$visit_name))) %>%
+    dplyr::distinct()
+  # colnames(dref) <- c("id", "visit")
 
   ##############################################################################
   ## Step 1 Fit mixed models
@@ -181,34 +193,39 @@ fli <- function(
       )
     }
     betaTilde <- lme4::fixef(fit_uni) ## fixed effects estimates
-    re_df <- NA
-    re_df <- lme4::ranef(fit_uni) ## random effects
+    re.ls <- lme4::ranef(fit_uni) ## random effects
+    id.visit <- strsplit(rownames(re.ls[[paste0(var.names$id_name, ":", var.names$visit_name)]]), ":")
+    re.df.id <- data.frame(
+      rownames(re.ls[[var.names$id_name]]),
+      re.ls[[var.names$id_name]][[1]]
+    ) %>% setNames(c(var.names$id_name, "re_id"))
+    re.df.id.visit <- data.frame(
+      sapply(id.visit, function(x) x[1]),
+      sapply(id.visit, function(x) x[2]),
+      re.ls[[paste0(var.names$id_name, ":", var.names$visit_name)]][[1]]
+    ) %>% setNames(c(var.names$id_name, var.names$visit_name, "re_id_visit"))
+    re.df <- dref %>%
+      dplyr::left_join(re.df.id, by = var.names$id_name) %>%
+      dplyr::left_join(re.df.id.visit, by = c(var.names$id_name, var.names$visit_name)) %>%
+      mutate(re = re_id + re_id_visit)
     se_mat <- summary(fit_uni)$coefficients[, "Std. Error"] ## se of fixed effects
-    model_matrix = cbind(
-      dplyr::select(
-        dtemp,
-        all_of(c(var.names$id_name, var.names$visit_name))
-      ),
-      model.matrix(fit_uni)
-    ) %>% dplyr::distinct(
-    ) %>% dplyr::select(
-      - all_of(c(var.names$id_name, var.names$visit_name))
-    ) %>% as.matrix()
-
+    model_matrix = dref %>%
+      left_join(cbind(
+        dplyr::select(dtemp, all_of(c(var.names$id_name, var.names$visit_name))),
+        model.matrix(fit_uni)
+      ), by = c(var.names$id_name, var.names$visit_name)) %>% dplyr::distinct() %>%
+      dplyr::select(- all_of(c(var.names$id_name, var.names$visit_name))) %>%
+      as.matrix()
     return(
       list(
         betaTilde = betaTilde,
-        # group = varcorr[1,1],
-        # aic = stats::AIC(fit_uni),
-        # bic = stats::BIC(fit_uni),
-        # residuals = resids,
-        # caic = aic_met,
-        # re_df = re_df,
-        se_mat = se_mat,
+        se_mat    = se_mat,
         model_matrix = model_matrix,
-        re_names = rownames(re_df[[paste0(var.names$id_name, ":", var.names$visit_name)]]),
-        re_vals = rep(re_df[[var.names$id_name]][[1]], times = nvisits$nvisits) +
-          re_df[[paste0(var.names$id_name, ":", var.names$visit_name)]][[1]]
+        re_names  = paste0(re.df[[var.names$id_name]], ":", re.df[[var.names$visit_name]]),
+        #rownames(re.df[[paste0(var.names$id_name, ":", var.names$visit_name)]]),
+        re_vals   = re.df$re
+        #rep(re.df[[var.names$id_name]][[1]], times = nvisits$nvisits) +
+        #re.df[[paste0(var.names$id_name, ":", var.names$visit_name)]][[1]]
       )
     )
   }
@@ -288,51 +305,53 @@ fli <- function(
   # mfpca.res <- read_rds(paste0(res.path, "mfpca.rds"))
   # mfpca.res <- read_rds("results/sim/mfpca.rds")
 
-
-
   ##############################################################################
   ## Step 4 Run STAN
   ##############################################################################
   if(!silent) print("Step 4: STAN")
-  # deigfun.l1.wide <- mfpca.res$efunctions$level1[, 1:mfpca.pars$npc_l1]
-  # deigfun.l2.wide <- mfpca.res$efunctions$level2[, 1:mfpca.pars$npc_l2]
+  # deigfun.l1.argvals <- mfpca.res$efunctions$level1[, 1:mfpca.pars$npc_l1]
+  # deigfun.l2.argvals <- mfpca.res$efunctions$level2[, 1:mfpca.pars$npc_l2]
 
-  # Project eigenfunctions back to the full grid
-  deigfun.l1.wide <- reeval_efunctions(
-    knots = nknots,
-    argvals_bin = bin.pars$bin_midpoints,
-    argvals = argvals,
-    efunctions = mfpca.res$efunctions$level1[, 1:mfpca.pars$npc_l1],
-    npc = mfpca.pars$npc_l1
-  )
-  deigfun.l2.wide <- reeval_efunctions(
-    knots = nknots,
-    argvals_bin = bin.pars$bin_midpoints,
-    argvals = argvals,
-    efunctions = mfpca.res$efunctions$level2[, 1:mfpca.pars$npc_l2],
-    npc = mfpca.pars$npc_l2
-  )
-
-  # Fix beta in sampling
-  betaHat.reeval <- reeval_efunctions(
-    knots = nknots,
-    argvals_bin = bin.pars$bin_midpoints,
-    argvals = argvals,
-    efunctions = t(betaHat),
-    npc = p # p fixed effects
-  )
-  betaHat.reeval <- t(betaHat.reeval)
-
-  b0.mfpca <- reeval_efunctions(
-    knots = nknots,
-    argvals_bin = bin.pars$bin_midpoints,
-    argvals = argvals,
-    efunctions = data.frame(mfpca.res$mu),
-    npc = 1
-  )[, 1]
+  if(length(bin.pars$bin_midpoints) < length(argvals)){
+    # Project eigenfunctions back to the full grid
+    deigfun.l1.argvals <- reeval_efunctions(
+      knots = nknots,
+      argvals_bin = bin.pars$bin_midpoints,
+      argvals = argvals,
+      efunctions = mfpca.res$efunctions$level1[, 1:mfpca.pars$npc_l1],
+      npc = mfpca.pars$npc_l1
+    )
+    deigfun.l2.argvals <- reeval_efunctions(
+      knots = nknots,
+      argvals_bin = bin.pars$bin_midpoints,
+      argvals = argvals,
+      efunctions = mfpca.res$efunctions$level2[, 1:mfpca.pars$npc_l2],
+      npc = mfpca.pars$npc_l2
+    )
+    # Fix beta in sampling
+    betaHat.argvals <- reeval_efunctions(
+      knots = nknots,
+      argvals_bin = bin.pars$bin_midpoints,
+      argvals = argvals,
+      efunctions = t(betaHat),
+      npc = p # p fixed effects
+    )
+    betaHat.argvals <- t(betaHat.argvals)
+    b0.argvals <- reeval_efunctions(
+      knots = nknots,
+      argvals_bin = bin.pars$bin_midpoints,
+      argvals = argvals,
+      efunctions = data.frame(mfpca.res$mu),
+      npc = 1
+    )[, 1]
+  } else {
+    deigfun.l1.argvals <- mfpca.res$efunctions$level1[, 1:mfpca.pars$npc_l1]
+    deigfun.l2.argvals <- mfpca.res$efunctions$level2[, 1:mfpca.pars$npc_l2]
+    betaHat.argvals    <- betaHat
+    b0.argvals         <- mfpca.res$mu
+  }
 
   fixef.design.mx <- model.matrix(formula.fixef, data)
-
   standata <- list(
     Nsubs = length(unique(data[[var.names$id_name]])),
     Nfuns = sum(nvisits$nvisits),
@@ -344,10 +363,10 @@ fli <- function(
     y     = data[[model_formula[[2]]]],
     X     = fixef.design.mx,
     nvisits   = nvisits$nvisits,
-    beta_0    = b0.mfpca,
-    betaHat   = betaHat.reeval,
-    efuncs_l1 = t(deigfun.l1.wide),
-    efuncs_l2 = t(deigfun.l2.wide),
+    beta_0    = b0.argvals,
+    betaHat   = betaHat.argvals,
+    efuncs_l1 = t(deigfun.l1.argvals),
+    efuncs_l2 = t(deigfun.l2.argvals),
     grainsize = 1
   )
   if(dir.path$save_intermediate_res){
@@ -369,12 +388,10 @@ fli <- function(
   #   )
   # }
 
-
   # new way, using {instantiate}
   stanmodel <- instantiate::stan_package_model(
     name = paste0("stanmodel-", family), package = "fli"
   )
-
   tic <- Sys.time()
   stanfit <- stanmodel$sample(
     # data = paste0(res.path, "standata.json"),
@@ -414,7 +431,6 @@ fli <- function(
   }
   l1score.post.mean <- apply(l1score.posterior, c(1,3), mean)
 
-
   l2score.posterior <- array(NA, c(standata$Nfuns, stan.pars$iter_sampling, mfpca.pars$npc_l2))
   for(i in 1:standata$Nfuns){
     # print(i)
@@ -432,12 +448,12 @@ fli <- function(
       betaTilde = betaTilde,
       betaHat  = betaHat,
       betaSE   = betaSE,
-      beta0_mfpca = b0.mfpca,
+      beta0_mfpca = b0.argvals,
       # beta_posterior = beta.posterior,
       # beta_post_mean = beta.post.mean,
       efunctions = list(
-        level1 = deigfun.l1.wide,
-        level2 = deigfun.l2.wide
+        level1 = deigfun.l1.argvals,
+        level2 = deigfun.l2.argvals
       ),
       scores_posterior = list(
         level1 = l1score.posterior,
@@ -461,8 +477,8 @@ fli <- function(
 #   beta_posterior = beta.posterior,
 #   beta_post_mean = beta.post.mean,
 #   efunctions = list(
-#     level1 = deigfun.l1.wide,
-#     level2 = deigfun.l2.wide
+#     level1 = deigfun.l1.argvals,
+#     level2 = deigfun.l2.argvals
 #   ),
 #   scores_posterior = list(
 #     level1 = l1score.posterior,
@@ -528,8 +544,8 @@ fli <- function(
 # plot(l1score.posterior$`xil1_sc[1,1]`, type = "l")
 
 # fli.res$efunctions <- list(
-#   level1 = deigfun.l1.wide,
-#   level2 = deigfun.l2.wide
+#   level1 = deigfun.l1.argvals,
+#   level2 = deigfun.l2.argvals
 # )
 # fli.res$scores_postmean <- scores_postmean
 # fli.res$scores_quantile <- scores_quantile
