@@ -116,7 +116,7 @@ fli <- function(
   }
 
   # Filter out NA in the data set
-  data <- filter(data, !is.na(.data[[model_formula[[2]]]]))
+  # data <- filter(data, !is.na(.data[[model_formula[[2]]]]))
   # Convert id and visit names to character for merging with random effect df later
   data[[var.names$id_name]] <- as.character(data[[var.names$id_name]])
   data[[var.names$visit_name]] <- as.character(data[[var.names$visit_name]])
