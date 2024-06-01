@@ -12,6 +12,7 @@ data {
   int<lower=0> ylen;        // Length of the outcome vector
   int<lower=0> p;           // number of columns in the fixed effect design matrix
   array[ylen] real y;       // outcome (Gaussian functional data)
+  array[ylen] int non_na;      // indices of non-NA values in the original data.
   matrix[ylen, p]  X;   // design matrix for fixed effects
   array[Nsubs] int nvisits; // a vector of the number of repeated functions within individuals
   row_vector[S] beta_0;     // intercept function estimated from step 3
@@ -71,7 +72,7 @@ model {
                 inx = inx + 1;
           }
   }
-  eta_vec = to_vector((eta_mat_ij)');
+  eta_vec = to_vector((eta_mat_ij)')[non_na];
 
   // likelihood
   // target += reduce_sum(partial_sum_lpmf, y, grainsize, eta_vec + beta_0);

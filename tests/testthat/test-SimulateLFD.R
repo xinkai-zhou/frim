@@ -1,4 +1,4 @@
-test_that("multiplication works", {
+test_that("SimulateLFD", {
   set.seed(1)
   dsim <- SimulateLFD()
   # orthonormal

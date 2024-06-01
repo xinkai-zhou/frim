@@ -10,7 +10,10 @@ data {
   int<lower=0> L;    // number of level 1 eigenfunctions
   int<lower=0> M;    // number of level 2 eigenfunctions
   int<lower=0> ylen;    // Length of the outcome vector
+  int<lower=0> p;           // number of columns in the fixed effect design matrix
   array[ylen] int<lower=0,upper=1> y; // outcome (binary functional data)
+  array[ylen] int non_na;      // indices of non-NA values in the original data.
+  matrix[ylen, p]  X;   // design matrix for fixed effects
   array[Nsubs] int nvisits; // a vector of the number of repeated functions within individuals
   row_vector[S] beta_0; // intercept function estimated from step 3
   matrix[L,S]   efuncs_l1; // level 1 eigen functions
@@ -38,13 +41,13 @@ model {
   vector[ylen] eta_vec;
   matrix[Nsubs, S] eta_mat_i;
   matrix[Nfuns, S] eta_mat_ij;
-  
+
   // priors
   to_vector(xil1) ~ normal(0,1);
   to_vector(xil2) ~ normal(0,1);
   sigmal1sq ~ inv_gamma(1, 1);
   sigmal2sq ~ inv_gamma(1, 1);
-  
+
   // New implementation
   eta_mat_i = xil1_sc * efuncs_l1;
   for(i in 1:Nsubs){
@@ -58,8 +61,8 @@ model {
                 inx = inx + 1;
           }
   }
-  eta_vec = to_vector((eta_mat_ij)');
-  
+  eta_vec = to_vector((eta_mat_ij)')[non_na];
+
   // likelihood
   // target += reduce_sum(partial_sum_lpmf, y, grainsize, eta_vec + beta_0);
   target += reduce_sum(partial_sum_lpmf, y, grainsize, eta_vec);

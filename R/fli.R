@@ -211,8 +211,9 @@ fli <- function(
     se_mat <- summary(fit_uni)$coefficients[, "Std. Error"] ## se of fixed effects
     model_matrix = dref %>%
       left_join(cbind(
-        dplyr::select(dtemp, all_of(c(var.names$id_name, var.names$visit_name))) %>%
-          filter(!is.na(.data[[model_formula[[2]]]])),
+        dtemp %>%
+          filter(!is.na(.data[[model_formula[[2]]]])) %>%
+          dplyr::select(, all_of(c(var.names$id_name, var.names$visit_name))),
         model.matrix(fit_uni)
       ), by = c(var.names$id_name, var.names$visit_name)) %>% dplyr::distinct() %>%
       dplyr::select(- all_of(c(var.names$id_name, var.names$visit_name))) %>%
@@ -353,16 +354,18 @@ fli <- function(
   }
 
   fixef.design.mx <- model.matrix(formula.fixef, data)
+  nonna.idx <- which(!is.na(data[[model_formula[[2]]]]))
   standata <- list(
-    Nsubs = length(unique(data[[var.names$id_name]])),
-    Nfuns = sum(nvisits$nvisits),
-    S     = length(argvals),
-    L     = mfpca.pars$npc_l1,
-    M     = mfpca.pars$npc_l2,
-    ylen  = nrow(data),
-    p     = p,
-    y     = data[[model_formula[[2]]]],
-    X     = fixef.design.mx,
+    Nsubs     = length(unique(data[[var.names$id_name]])),
+    Nfuns     = sum(nvisits$nvisits),
+    S         = length(argvals),
+    L         = mfpca.pars$npc_l1,
+    M         = mfpca.pars$npc_l2,
+    ylen      = length(nonna.idx), # number of non-NA observations
+    p         = p,
+    y         = data[[model_formula[[2]]]][nonna.idx], # STAN does not accept NA
+    non_na    = nonna.idx,
+    X         = fixef.design.mx[nonna.idx, , drop = F],
     nvisits   = nvisits$nvisits,
     beta_0    = b0.argvals,
     betaHat   = betaHat.argvals,

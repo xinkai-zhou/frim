@@ -77,7 +77,8 @@ SimulateLFD <- function(
   }
 
   ## generate random effects
-  subid <- as.factor(rep(1:I, times = Js))
+  # subid <- as.factor(rep(1:I, times = Js))
+  subid <- as.character(rep(1:I, times = Js))
   ranef.design <- model.matrix( ~ 0 + subid)
   ranef.l1 <- scores$level1 %*% t(efunctions$level1)
   ranef <- ranef.design %*% ranef.l1
