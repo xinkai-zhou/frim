@@ -13,6 +13,7 @@
 #' For more information on each step, please refer to the FLI paper.
 #'
 #' @param formula Two-sided formula object in lme4 formula syntax.
+#' The visit variable should be included as a fixed effect covariate.
 #' @param formula.fixef Formula for the fixed effect. WILL CHANGE LATER.
 #' @param data A data frame in long format
 #' @param family GLM family of the response. Defaults to \code{gaussian}.
@@ -71,7 +72,8 @@ fli <- function(
     mfpca.pars = list(
       pve = 0.99,
       npc_l1 = 4,
-      npc_l2 = 4
+      npc_l2 = 4,
+      visit.levels = NULL
     ),
     stan.pars = list(
       iter_warmup = 1000,
@@ -90,7 +92,7 @@ fli <- function(
     ){
 
   # If doing parallel computing, set up the number of cores
-  if(parallel & !is.integer(num_cores) ) num_cores <- parallel::detectCores() - 1
+  if(parallel & !is.integer(num_cores)) num_cores <- parallel::detectCores() - 1
 
   # Organize the input from the model formula
   model_formula <- as.character(formula)
@@ -109,6 +111,11 @@ fli <- function(
   }
   rm(dep_str)
 
+  #
+  if(!is.factor(data[[var.names$visit_name]]) & is.null(mfpca.pars$visit.levels)){
+    stop(paste0("Convert ", var.names$visit_name, "to a factor, or specify the visit.levels argument from mfpca.pars."))
+  }
+
   # create a folder for saving intermediate results
   if(dir.path$save_intermediate_res){
     res.path <- dir.path$intermediate_res_path
@@ -117,11 +124,27 @@ fli <- function(
 
   # Filter out NA in the data set
   # data <- filter(data, !is.na(.data[[model_formula[[2]]]]))
-  # Convert id and visit names to character for merging with random effect df later
-  data[[var.names$id_name]] <- as.character(data[[var.names$id_name]])
-  data[[var.names$visit_name]] <- as.character(data[[var.names$visit_name]])
 
-  # Get a reference data frame that contains the unique id and visit combo
+  # Convert id to character for merging with random effect df later
+  data[[var.names$id_name]] <- as.character(data[[var.names$id_name]])
+
+  # Convert visit to a factor because MFPCA arranges visit-specific means (eta)
+  # as columns in the same order as the levels of the visit variable.
+  if(!is.factor(data[[var.names$visit_name]])){
+    # data[[var.names$visit_name]] <- as.character(data[[var.names$visit_name]])
+    data[[var.names$visit_name]] <-
+      factor(data[[var.names$visit_name]], levels = mfpca.pars$visit.levels)
+  }
+
+  # Arrange data in the order of id, visit, time (domain)
+  data <- data %>% arrange(
+    .data[[var.names$id_name]],
+    .data[[var.names$visit_name]],
+    .data[[var.names$domain_name]]
+  )
+
+
+  # Get a reference data frame that contains the unique id and visit combo.
   # When local bins do not have data for a specific id-visit, the reference df
   # will be used to mark the corresponding random effect as NA.
   dref <- data %>%
@@ -130,7 +153,7 @@ fli <- function(
   # colnames(dref) <- c("id", "visit")
 
   ##############################################################################
-  ## Step 1 Fit mixed models
+  ## Step 1 Create data bins
   ##############################################################################
   if(!silent) print("Step 1: Fit Massively Univariate Mixed Models")
 
@@ -165,9 +188,10 @@ fli <- function(
     nvisits = n_distinct(.data[[var.names$visit_name]]),
     .by = all_of(var.names$id_name)
   )
-  # Create a matrix to store AICs
-  # AIC_mat <- matrix(NA, nrow = L, ncol = 2)
 
+  ##############################################################################
+  ## Step 2 Fit mixed models
+  ##############################################################################
   ### Create a function that fit a mixed model in bin l
   ### Input: l: index of the list bin.index.
   ###           Each element in the list is a vector containing domain points for that bin.
@@ -261,7 +285,7 @@ fli <- function(
   randEff <-  t(do.call(rbind, lapply(massmm, '[[', "re_vals")))
 
   ##############################################################################
-  ## Step 2 Smooth fixed effects
+  ## Step 3 Smooth fixed effects, adjust random effects
   ##############################################################################
   if(!silent) print("Step 2: Smoothing")
 
@@ -288,7 +312,7 @@ fli <- function(
   }
 
   ##############################################################################
-  ## Step 3 MFPCA
+  ## Step 4 MFPCA
   ##############################################################################
   if(!silent) print("Step 3: MFPCA")
   id.visit <- strsplit(massmm[[1]][["re_names"]], ":")
@@ -339,18 +363,26 @@ fli <- function(
       npc = p # p fixed effects
     )
     betaHat.argvals <- t(betaHat.argvals)
-    b0.argvals <- reeval_efunctions(
+    mu0.argvals <- reeval_efunctions(
       knots = nknots,
       argvals_bin = bin.pars$bin_midpoints,
       argvals = argvals,
       efunctions = data.frame(mfpca.res$mu),
       npc = 1
     )[, 1]
+    muj.argvals <- reeval_efunctions(
+      knots = nknots,
+      argvals_bin = bin.pars$bin_midpoints,
+      argvals = argvals,
+      efunctions = data.frame(mfpca.res$eta),
+      npc = ncol(mfpca.res$eta)
+    )
   } else {
     deigfun.l1.argvals <- mfpca.res$efunctions$level1[, 1:mfpca.pars$npc_l1]
     deigfun.l2.argvals <- mfpca.res$efunctions$level2[, 1:mfpca.pars$npc_l2]
     betaHat.argvals    <- betaHat
-    b0.argvals         <- mfpca.res$mu
+    mu0.argvals        <- mfpca.res$mu
+    muj.argvals        <- mfpca.res$eta
   }
 
   fixef.design.mx <- model.matrix(formula.fixef, data)
@@ -362,13 +394,15 @@ fli <- function(
     L         = mfpca.pars$npc_l1,
     M         = mfpca.pars$npc_l2,
     ylen      = length(nonna.idx), # number of non-NA observations
-    p         = p,
-    y         = data[[model_formula[[2]]]][nonna.idx], # STAN does not accept NA
-    non_na    = nonna.idx,
-    X         = fixef.design.mx[nonna.idx, , drop = F],
+    p         = p, # dimension of fixed effect
+    visit     = as.integer(data[[var.names$visit_name]][nonna.idx]), # pass factor as integer;
     nvisits   = nvisits$nvisits,
-    beta_0    = b0.argvals,
+    non_na    = nonna.idx,
+    y         = data[[model_formula[[2]]]][nonna.idx], # STAN does not accept NA
+    X         = fixef.design.mx[nonna.idx, , drop = F],
     betaHat   = betaHat.argvals,
+    mu_0      = mu0.argvals,
+    mu_j      = muj.argvals,
     efuncs_l1 = t(deigfun.l1.argvals),
     efuncs_l2 = t(deigfun.l2.argvals),
     grainsize = 1
@@ -408,8 +442,12 @@ fli <- function(
   )
   toc <- Sys.time()
   toc - tic
+  if(dir.path$save_intermediate_res) saveRDS(stanfit, file = paste0(res.path, "stanfit.rds"))
+  stanfit.summary <- stanfit$summary()
+  # rhat.val <- stanfit.summary$rhat
   draws.df <- stanfit$draws(format = "df")
-  if(dir.path$save_intermediate_res) saveRDS(draws.df, file = paste0(res.path, "mcmcdraws.rds"))
+
+  # if(dir.path$save_intermediate_res) saveRDS(draws.df, file = paste0(res.path, "mcmcdraws.rds"))
   # draws.df <- read_rds(paste0(res.path, "mcmcdraws.rds"))
   # draws.df <- read_rds(paste0("results/sim/mcmcdraws.rds"))
   # sigma.sq <- draws.df[, grep("sigma_epi_sq", colnames(draws.df))]
@@ -425,7 +463,8 @@ fli <- function(
   # }
   # beta.post.mean <- apply(beta.posterior, c(1,3), mean)
 
-  l1score.posterior <- array(NA, c(standata$Nsubs, stan.pars$iter_sampling, mfpca.pars$npc_l1))
+  l1score.posterior <-
+    array(NA, c(standata$Nsubs, stan.pars$chains * stan.pars$iter_sampling, mfpca.pars$npc_l1))
   for(i in 1:standata$Nsubs){
     # print(i)
     for(k in 1:mfpca.pars$npc_l1){
@@ -435,7 +474,8 @@ fli <- function(
   }
   l1score.post.mean <- apply(l1score.posterior, c(1,3), mean)
 
-  l2score.posterior <- array(NA, c(standata$Nfuns, stan.pars$iter_sampling, mfpca.pars$npc_l2))
+  l2score.posterior <-
+    array(NA, c(standata$Nfuns, stan.pars$chains * stan.pars$iter_sampling, mfpca.pars$npc_l2))
   for(i in 1:standata$Nfuns){
     # print(i)
     for(k in 1:mfpca.pars$npc_l2){
@@ -447,12 +487,13 @@ fli <- function(
 
   return(
     list(
-      argvals  = argvals,
-      id_visit = id.visit,
+      argvals   = argvals,
+      id_visit  = id.visit,
       betaTilde = betaTilde,
-      betaHat  = betaHat,
-      betaSE   = betaSE,
-      beta0_mfpca = b0.argvals,
+      betaHat   = betaHat,
+      betaSE    = betaSE,
+      mu0_mfpca = mu0.argvals,
+      muj_mfpca = muj.argvals,
       # beta_posterior = beta.posterior,
       # beta_post_mean = beta.post.mean,
       efunctions = list(
@@ -467,6 +508,7 @@ fli <- function(
         level1 = l1score.post.mean,
         level2 = l2score.post.mean
       ),
+      stanfit_summary = stanfit.summary,
       ci.level = ci.level
     )
   )

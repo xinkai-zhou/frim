@@ -4,6 +4,10 @@
 #   name = paste0("stanmodel-gaussian"), package = "fli"
 # )
 
+
+# todo:
+# 1. simulate irregularly spaced functional data and make sure the code works
+
 if(!instantiate::stan_cmdstan_exists()) skip("Tests for fli() skipped because cmdstan is not available.")
 
 test_that("fli-gaussian", {
