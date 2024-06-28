@@ -44,7 +44,6 @@ transformed parameters {
 model {
   int inx;
   vector[ylen]     eta_vec;
-  // matrix[1, S]  fixef;
   row_vector[S]    fixef;
   matrix[Nsubs, S] eta_mat_i;
   matrix[Nfuns, S] eta_mat_ij;
