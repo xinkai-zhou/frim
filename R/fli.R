@@ -56,7 +56,7 @@ fli <- function(
     argvals = NULL,
     bin.pars = list(
       bin_midpoints = NULL,
-      bin_len = 20,
+      bin_len = 20, # given in terms of the number of argvals
       cyclic
     ),
     var.names = list(
@@ -111,9 +111,15 @@ fli <- function(
   }
   rm(dep_str)
 
-  #
   if(!is.factor(data[[var.names$visit_name]]) & is.null(mfpca.pars$visit.levels)){
-    stop(paste0("Convert ", var.names$visit_name, "to a factor, or specify the visit.levels argument from mfpca.pars."))
+    stop(paste0("Convert ", var.names$visit_name, " to a factor, or specify the visit.levels argument from mfpca.pars."))
+  }
+  # Convert visit to a factor because MFPCA arranges visit-specific means (eta)
+  # as columns in the same order as the levels of the visit variable.
+  if(!is.factor(data[[var.names$visit_name]])){
+    # data[[var.names$visit_name]] <- as.character(data[[var.names$visit_name]])
+    data[[var.names$visit_name]] <-
+      factor(data[[var.names$visit_name]], levels = mfpca.pars$visit.levels)
   }
 
   # create a folder for saving intermediate results
@@ -128,13 +134,6 @@ fli <- function(
   # Convert id to character for merging with random effect df later
   data[[var.names$id_name]] <- as.character(data[[var.names$id_name]])
 
-  # Convert visit to a factor because MFPCA arranges visit-specific means (eta)
-  # as columns in the same order as the levels of the visit variable.
-  if(!is.factor(data[[var.names$visit_name]])){
-    # data[[var.names$visit_name]] <- as.character(data[[var.names$visit_name]])
-    data[[var.names$visit_name]] <-
-      factor(data[[var.names$visit_name]], levels = mfpca.pars$visit.levels)
-  }
 
   # Arrange data in the order of id, visit, time (domain)
   data <- data %>% arrange(
@@ -327,6 +326,8 @@ fli <- function(
     argvals = bin.pars$bin_midpoints,
     pve = mfpca.pars$pve
   )
+  mfpca.res.npc_l1 <- ncol(mfpca.res$efunctions$level1)
+  mfpca.res.npc_l2 <- ncol(mfpca.res$efunctions$level2)
   if(dir.path$save_intermediate_res) saveRDS(mfpca.res, paste0(res.path, "mfpca.rds"))
   # mfpca.res <- read_rds(paste0(res.path, "mfpca.rds"))
   # mfpca.res <- read_rds("results/sim/mfpca.rds")
@@ -344,15 +345,15 @@ fli <- function(
       knots = nknots,
       argvals_bin = bin.pars$bin_midpoints,
       argvals = argvals,
-      efunctions = mfpca.res$efunctions$level1[, 1:mfpca.pars$npc_l1],
-      npc = mfpca.pars$npc_l1
+      efunctions = mfpca.res$efunctions$level1[, 1:min(mfpca.res.npc_l1, mfpca.pars$npc_l1)],
+      npc = min(mfpca.res.npc_l1, mfpca.pars$npc_l1)
     )
     deigfun.l2.argvals <- reeval_efunctions(
       knots = nknots,
       argvals_bin = bin.pars$bin_midpoints,
       argvals = argvals,
-      efunctions = mfpca.res$efunctions$level2[, 1:mfpca.pars$npc_l2],
-      npc = mfpca.pars$npc_l2
+      efunctions = mfpca.res$efunctions$level2[, 1:min(mfpca.res.npc_l2, mfpca.pars$npc_l2)],
+      npc = min(mfpca.res.npc_l2, mfpca.pars$npc_l2)
     )
     # Fix beta in sampling
     betaHat.argvals <- reeval_efunctions(
@@ -378,8 +379,8 @@ fli <- function(
       npc = ncol(mfpca.res$eta)
     )
   } else {
-    deigfun.l1.argvals <- mfpca.res$efunctions$level1[, 1:mfpca.pars$npc_l1]
-    deigfun.l2.argvals <- mfpca.res$efunctions$level2[, 1:mfpca.pars$npc_l2]
+    deigfun.l1.argvals <- mfpca.res$efunctions$level1[, 1:min(mfpca.res.npc_l1, mfpca.pars$npc_l1)]
+    deigfun.l2.argvals <- mfpca.res$efunctions$level2[, 1:min(mfpca.res.npc_l2, mfpca.pars$npc_l2)]
     betaHat.argvals    <- betaHat
     mu0.argvals        <- mfpca.res$mu
     muj.argvals        <- mfpca.res$eta
@@ -391,8 +392,8 @@ fli <- function(
     Nsubs     = length(unique(data[[var.names$id_name]])),
     Nfuns     = sum(nvisits$nvisits),
     S         = length(argvals),
-    L         = mfpca.pars$npc_l1,
-    M         = mfpca.pars$npc_l2,
+    L         = min(mfpca.res.npc_l1, mfpca.pars$npc_l1),
+    M         = min(mfpca.res.npc_l2, mfpca.pars$npc_l2),
     ylen      = length(nonna.idx), # number of non-NA observations
     p         = p, # dimension of fixed effect
     visit     = as.integer(data[[var.names$visit_name]][nonna.idx]), # pass factor as integer;
@@ -443,7 +444,7 @@ fli <- function(
   toc <- Sys.time()
   toc - tic
   if(dir.path$save_intermediate_res) saveRDS(stanfit, file = paste0(res.path, "stanfit.rds"))
-  stanfit.summary <- stanfit$summary()
+  # stanfit.summary <- stanfit$summary()
   # rhat.val <- stanfit.summary$rhat
   draws.df <- stanfit$draws(format = "df")
 
@@ -464,10 +465,10 @@ fli <- function(
   # beta.post.mean <- apply(beta.posterior, c(1,3), mean)
 
   l1score.posterior <-
-    array(NA, c(standata$Nsubs, stan.pars$chains * stan.pars$iter_sampling, mfpca.pars$npc_l1))
+    array(NA, c(standata$Nsubs, stan.pars$chains * stan.pars$iter_sampling, min(mfpca.res.npc_l1, mfpca.pars$npc_l1)))
   for(i in 1:standata$Nsubs){
     # print(i)
-    for(k in 1:mfpca.pars$npc_l1){
+    for(k in 1:min(mfpca.res.npc_l1, mfpca.pars$npc_l1)){
       temp.varname <- paste0("xil1_sc[", i, ",", k, "]")
       l1score.posterior[i, , k] <- draws.df[[temp.varname]]
     }
@@ -475,10 +476,10 @@ fli <- function(
   l1score.post.mean <- apply(l1score.posterior, c(1,3), mean)
 
   l2score.posterior <-
-    array(NA, c(standata$Nfuns, stan.pars$chains * stan.pars$iter_sampling, mfpca.pars$npc_l2))
+    array(NA, c(standata$Nfuns, stan.pars$chains * stan.pars$iter_sampling, min(mfpca.res.npc_l2, mfpca.pars$npc_l2)))
   for(i in 1:standata$Nfuns){
     # print(i)
-    for(k in 1:mfpca.pars$npc_l2){
+    for(k in 1:min(mfpca.res.npc_l2, mfpca.pars$npc_l2)){
       temp.varname <- paste0("xil2_sc[", i, ",", k, "]")
       l2score.posterior[i, , k] <- draws.df[[temp.varname]]
     }
@@ -488,6 +489,7 @@ fli <- function(
   return(
     list(
       argvals   = argvals,
+      bin_idx   = bin.index,
       id_visit  = id.visit,
       betaTilde = betaTilde,
       betaHat   = betaHat,
@@ -508,7 +510,7 @@ fli <- function(
         level1 = l1score.post.mean,
         level2 = l2score.post.mean
       ),
-      stanfit_summary = stanfit.summary,
+      stanfit = stanfit,
       ci.level = ci.level
     )
   )

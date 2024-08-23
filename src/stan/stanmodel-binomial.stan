@@ -26,8 +26,10 @@ data {
 parameters {
   matrix[Nsubs, L] xil1;   // level 1 random effects
   matrix[Nfuns, M] xil2;   // level 2 random effects
-  vector<lower=0>[L] sigmal1sq; // sd of the random intercept term
-  vector<lower=0>[M] sigmal2sq; // sd of the random intercept term
+  // vector<lower=0>[L] sigmal1sq; // var of level1 scores
+  // vector<lower=0>[M] sigmal2sq; // var of level 2 scores
+  vector<lower=0>[L] tau1; // precision of level 1 scores
+  vector<lower=0>[M] tau2; // precision of level 2 scores
 }
 transformed parameters {
   matrix[Nsubs, L] xil1_sc;   // level 1 random effects
@@ -38,6 +40,12 @@ transformed parameters {
   for(m in 1:M){
       xil2_sc[,m] = xil2[,m] * sqrt(sigmal2sq[m]);
   }
+  // for(l in 1:L){
+  //     xil1_sc[,l] = xil1[,l] / sqrt(tau1[l]);
+  // }
+  // for(m in 1:M){
+  //     xil2_sc[,m] = xil2[,m] / sqrt(tau2[m]);
+  // }
 }
 model {
   int inx;
@@ -51,6 +59,8 @@ model {
   to_vector(xil2) ~ normal(0,1);
   sigmal1sq       ~ inv_gamma(0.01, 0.01);
   sigmal2sq       ~ inv_gamma(0.01, 0.01);
+  // tau1            ~ gamma(1e-6, 1e-6);
+  // tau2            ~ gamma(1e-6, 1e-6);
 
   // New implementation
   eta_mat_i = xil1_sc * efuncs_l1;

@@ -3,7 +3,7 @@ Package: fli
 Title: Fast local inference for longitudinal functional data
 Version: 0.1.0
 Authors@R: c(
-    person("Xinkai", "Zhou", , "xzhou118@jhu.edu", role = c("aut", "cre"),
+    person("Xinkai", "Zhou", , "xinkaizhou@ucla.edu", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0001-8564-3491")),
     person("Erjia", "Cui", , "ecui@umn.edu", role = "aut")
   )

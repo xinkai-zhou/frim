@@ -3,70 +3,82 @@
 #'
 #' @param argvals A vector containing locations of observations on the
 #' functional domain.
-#' @param bin_midpoints
-#' @param bin_len
+#' @param bin_midpoints Centers of the bins.
+#' @param bin_len Length of the bin. In the same unit as argvals.
 #' @param cyclic
 #'
 #' @export CreateBins
 #'
 CreateBins <- function(argvals, bin_midpoints, bin_len, cyclic = F){
   S <- length(argvals)
+  argvals.idx <- 1:S
+
   bin_midpoints <- sort(bin_midpoints)
   nbins <- length(bin_midpoints)
-  bin.index <- list()
+  bmp.idx <- rep(NA, nbins) # bin midpoint index
+  for(j in 1:nbins){
+    bmp.idx[j] <- which(argvals == bin_midpoints[j])
+  }
+
+  bins <- list()
   if(cyclic){
     for(j in 1:nbins){
-      left.end  <- bin_midpoints[j] - floor(bin_len / 2)
-      right.end <- bin_midpoints[j] + floor(bin_len / 2)
-      if(left.end < argvals[1]){
+      left.end  <- bmp.idx[j] - floor(bin_len / 2)
+      right.end <- bmp.idx[j] + floor(bin_len / 2)
+      if(left.end < argvals.idx[1]){
         if(left.end %% S == 0){
-          bin.index[[j]] <- c(S, argvals[1]:right.end)
+          bins[[j]] <- argvals[c(S, argvals.idx[1]:right.end)]
         } else {
-          bin.index[[j]] <- c((left.end %% S) : S, argvals[1]:right.end)
+          bins[[j]] <- argvals[c((left.end %% S) : S, argvals.idx[1]:right.end)]
         }
       } else if(right.end > S){
-        bin.index[[j]] <- c(left.end : S, 1:(right.end %% S))
+        bins[[j]] <- argvals[c(left.end : S, 1:(right.end %% S))]
       } else {
-        bin.index[[j]] <- left.end : right.end
+        bins[[j]] <- argvals[left.end : right.end]
       }
-      if(j == 1 & !(argvals[1] %in% bin.index[[j]])){
+      if(j == 1 & !(argvals[1] %in% bins[[j]])){
         warning("The first bin does not cover the left-most point on the domain.")
       }
-      if(j == nbins & !(argvals[S] %in% bin.index[[j]])){
+      if(j == nbins & !(argvals[S] %in% bins[[j]])){
         warning("The last bin does not cover the right-most point on the domain.")
       }
     }
   } else {
     for(j in 1:nbins){
-      left.end  <- bin_midpoints[j] - floor(bin_len / 2)
-      right.end <- bin_midpoints[j] + floor(bin_len / 2)
-      if(left.end < argvals[1]){
-        bin.index[[j]] <- argvals[1] : right.end
+      left.end  <- bmp.idx[j] - floor(bin_len / 2)
+      right.end <- bmp.idx[j] + floor(bin_len / 2)
+      if(left.end < argvals.idx[1]){
+        bins[[j]] <- argvals[argvals.idx[1] : right.end]
       } else if(left.end + bin_len - 1 > S){
-        bin.index[[j]] <- left.end : S
+        bins[[j]] <- argvals[left.end : S]
       } else {
-        bin.index[[j]] <- left.end : (left.end + bin_len - 1)
+        bins[[j]] <- argvals[left.end : (left.end + bin_len - 1)]
       }
-      if(j == 1 & !(argvals[1] %in% bin.index[[j]])){
+      if(j == 1 & !(argvals[1] %in% bins[[j]])){
         warning("The first bin does not cover the left-most point on the domain.")
       }
-      if(j == nbins & !(argvals[S] %in% bin.index[[j]])){
+      if(j == nbins & !(argvals[S] %in% bins[[j]])){
         warning("The last bin does not cover the right-most point on the domain.")
       }
     }
   }
-  names(bin.index) <- bin_midpoints
-  return(bin.index)
+  names(bins) <- bin_midpoints
+  return(bins)
 }
 
 # # Example
-# argvals <- 1:20
-# bin_len <- 7
-# bin_midpoints <- c(1, 5, 10, 15)
+# argvals <- c(1, seq(10, 1440, by = 10))
+# bin_len <- 6
+# bin_midpoints <- argvals
 # CreateBins(argvals = argvals, bin_midpoints = bin_midpoints, bin_len = bin_len, cyclic = T)
 # CreateBins(argvals = argvals, bin_midpoints = bin_midpoints, bin_len = bin_len, cyclic = F)
-
-
+#
+#
+# argvals <- 1:145
+# bin_len <- 5
+# bin_midpoints <- argvals
+# CreateBins(argvals = argvals, bin_midpoints = bin_midpoints, bin_len = bin_len, cyclic = T)
+# CreateBins(argvals = argvals, bin_midpoints = bin_midpoints, bin_len = bin_len, cyclic = F)
 
 
 
