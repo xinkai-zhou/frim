@@ -32,12 +32,12 @@ parameters {
   // matrix[p, S]    beta;             // fixed effect parameter
   matrix[Nsubs, L]   xil1;             // level 1 random effects
   matrix[Nfuns, M]   xil2;             // level 2 random effects
-  // vector<lower=0>[L] sigmal1sq;        // sd of the random intercept term
-  // vector<lower=0>[M] sigmal2sq;        // sd of the random intercept term
-  // real<lower=0>      sigma_epi_sq;     // sd of the error term
-  vector<lower=0>[L] tau1; // precision of level 1 scores
-  vector<lower=0>[M] tau2; // precision of level 2 scores
-  real<lower=0>      taue; // precision for noise
+  vector<lower=0>[L] sigmal1sq;        // sd of the random intercept term
+  vector<lower=0>[M] sigmal2sq;        // sd of the random intercept term
+  real<lower=0>      sigma_epi_sq;     // sd of the error term
+  // vector<lower=0>[L] tau1; // precision of level 1 scores
+  // vector<lower=0>[M] tau2; // precision of level 2 scores
+  // real<lower=0>      taue; // precision for noise
 }
 transformed parameters {
   matrix[Nsubs, L] xil1_sc;            // level 1 random effects

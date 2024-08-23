@@ -26,10 +26,10 @@ data {
 parameters {
   matrix[Nsubs, L] xil1;   // level 1 random effects
   matrix[Nfuns, M] xil2;   // level 2 random effects
-  // vector<lower=0>[L] sigmal1sq; // var of level1 scores
-  // vector<lower=0>[M] sigmal2sq; // var of level 2 scores
-  vector<lower=0>[L] tau1; // precision of level 1 scores
-  vector<lower=0>[M] tau2; // precision of level 2 scores
+  vector<lower=0>[L] sigmal1sq; // var of level1 scores
+  vector<lower=0>[M] sigmal2sq; // var of level 2 scores
+  // vector<lower=0>[L] tau1; // precision of level 1 scores
+  // vector<lower=0>[M] tau2; // precision of level 2 scores
 }
 transformed parameters {
   matrix[Nsubs, L] xil1_sc;   // level 1 random effects
