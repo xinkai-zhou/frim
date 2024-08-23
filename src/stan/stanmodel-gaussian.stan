@@ -1,13 +1,13 @@
-// functions {
-//   real partial_sum(array[] real y, int start, int end, vector eta, real sigma_epi_sq) {
-//     return normal_lpdf(y | eta[start:end], sqrt(sigma_epi_sq));
-//   }
-// }
 functions {
-  real partial_sum(array[] real y, int start, int end, vector eta, real taue) {
-    return normal_lpdf(y | eta[start:end], 1/sqrt(taue));
+  real partial_sum(array[] real y, int start, int end, vector eta, real sigma_epi_sq) {
+    return normal_lpdf(y | eta[start:end], sqrt(sigma_epi_sq));
   }
 }
+// functions {
+//   real partial_sum(array[] real y, int start, int end, vector eta, real taue) {
+//     return normal_lpdf(y | eta[start:end], 1/sqrt(taue));
+//   }
+// }
 data {
   int<lower=0>            Nsubs;       // number of individuals (first level)
   int<lower=0>            Nfuns;       // number of observed functions
@@ -91,7 +91,6 @@ model {
   }
   eta_vec = to_vector((eta_mat_ij)')[non_na];
 
-  // likelihood
-  // target += reduce_sum(partial_sum_lpmf, y, grainsize, eta_vec + mu_0);
-  target += reduce_sum(partial_sum, y, grainsize, eta_vec, taue);
+  target += reduce_sum(partial_sum, y, grainsize, eta_vec, sigma_epi_sq);
+  // target += reduce_sum(partial_sum, y, grainsize, eta_vec, taue);
 }

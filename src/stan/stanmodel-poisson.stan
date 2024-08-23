@@ -79,6 +79,5 @@ model {
   eta_vec = to_vector((eta_mat_ij)')[non_na];
 
   // likelihood
-  // target += reduce_sum(partial_sum_lpmf, y, grainsize, eta_vec + mu_0);
   target += reduce_sum(partial_sum_lpmf, y, grainsize, eta_vec);
 }
