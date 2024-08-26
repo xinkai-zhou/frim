@@ -134,14 +134,12 @@ fli <- function(
   # Convert id to character for merging with random effect df later
   data[[var.names$id_name]] <- as.character(data[[var.names$id_name]])
 
-
   # Arrange data in the order of id, visit, time (domain)
   data <- data %>% arrange(
     .data[[var.names$id_name]],
     .data[[var.names$visit_name]],
     .data[[var.names$domain_name]]
   )
-
 
   # Get a reference data frame that contains the unique id and visit combo.
   # When local bins do not have data for a specific id-visit, the reference df
@@ -494,6 +492,7 @@ fli <- function(
       betaTilde = betaTilde,
       betaHat   = betaHat,
       betaSE    = betaSE,
+      localglmm = massmm,
       mu0_mfpca = mu0.argvals,
       muj_mfpca = muj.argvals,
       # beta_posterior = beta.posterior,
