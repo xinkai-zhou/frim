@@ -72,7 +72,8 @@ model {
   for(i in 1:Nsubs){
           for(j in 1:nvisits[i]){
                 fixef = X[inx, ] * betaHat; // fixed effect at all time points
-                eta_mat_ij[inx,] =  fixef + (mu_j[, visit[inx]])' + eta_mat_ij[inx,] + eta_mat_i[i,];
+                // eta_mat_ij[inx,] =  fixef + (mu_j[, visit[inx]])' + eta_mat_ij[inx,] + eta_mat_i[i,];
+                eta_mat_ij[inx,] =  fixef + eta_mat_ij[inx,] + eta_mat_i[i,];
                 inx = inx + 1;
           }
   }
