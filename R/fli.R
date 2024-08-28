@@ -132,7 +132,9 @@ fli <- function(
   # data <- filter(data, !is.na(.data[[model_formula[[2]]]]))
 
   # Convert id to character for merging with random effect df later
-  data[[var.names$id_name]] <- as.character(data[[var.names$id_name]])
+  id.unique <- unique(data[[var.names$id_name]])
+  data[[var.names$id_name]] <- factor(data[[var.names$id_name]], levels = id.unique)
+  # data[[var.names$id_name]] <- as.character(data[[var.names$id_name]])
 
   # Arrange data in the order of id, visit, time (domain)
   data <- data %>% arrange(
