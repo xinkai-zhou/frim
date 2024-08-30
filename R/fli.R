@@ -231,7 +231,7 @@ fli <- function(
       dplyr::left_join(re.df.id, by = var.names$id_name) %>%
       dplyr::left_join(re.df.id.visit, by = c(var.names$id_name, var.names$visit_name)) %>%
       mutate(re = re_id + re_id_visit)
-    se_mat <- summary(fit_uni)$coefficients[, "Std. Error"] ## se of fixed effects
+    # se_mat <- summary(fit_uni)$coefficients[, "Std. Error"] ## se of fixed effects
     model_matrix = dref %>%
       left_join(cbind(
         dtemp %>%
@@ -244,7 +244,7 @@ fli <- function(
     return(
       list(
         betaTilde = betaTilde,
-        se_mat    = se_mat,
+        # se_mat    = se_mat,
         model_matrix = model_matrix,
         re_names  = paste0(re.df[[var.names$id_name]], ":", re.df[[var.names$visit_name]]),
         #rownames(re.df[[paste0(var.names$id_name, ":", var.names$visit_name)]]),
@@ -266,7 +266,7 @@ fli <- function(
 
   # Obtain betaTilde, fixed effects estimates
   betaTilde <- t(do.call(rbind, lapply(massmm, '[[', "betaTilde")))
-  betaSE <- t(do.call(rbind, lapply(massmm, '[[', "se_mat")))
+  # betaSE <- t(do.call(rbind, lapply(massmm, '[[', "se_mat")))
   colnames(betaTilde) <- names(bin.index)
   p <- nrow(betaTilde)
 
@@ -364,26 +364,26 @@ fli <- function(
       npc = p # p fixed effects
     )
     betaHat.argvals <- t(betaHat.argvals)
-    mu0.argvals <- reeval_efunctions(
-      knots = nknots,
-      argvals_bin = bin.pars$bin_midpoints,
-      argvals = argvals,
-      efunctions = data.frame(mfpca.res$mu),
-      npc = 1
-    )[, 1]
-    muj.argvals <- reeval_efunctions(
-      knots = nknots,
-      argvals_bin = bin.pars$bin_midpoints,
-      argvals = argvals,
-      efunctions = data.frame(mfpca.res$eta),
-      npc = ncol(mfpca.res$eta)
-    )
+    # mu0.argvals <- reeval_efunctions(
+    #   knots = nknots,
+    #   argvals_bin = bin.pars$bin_midpoints,
+    #   argvals = argvals,
+    #   efunctions = data.frame(mfpca.res$mu),
+    #   npc = 1
+    # )[, 1]
+    # muj.argvals <- reeval_efunctions(
+    #   knots = nknots,
+    #   argvals_bin = bin.pars$bin_midpoints,
+    #   argvals = argvals,
+    #   efunctions = data.frame(mfpca.res$eta),
+    #   npc = ncol(mfpca.res$eta)
+    # )
   } else {
     deigfun.l1.argvals <- mfpca.res$efunctions$level1[, 1:min(mfpca.res.npc_l1, mfpca.pars$npc_l1)]
     deigfun.l2.argvals <- mfpca.res$efunctions$level2[, 1:min(mfpca.res.npc_l2, mfpca.pars$npc_l2)]
     betaHat.argvals    <- betaHat
-    mu0.argvals        <- mfpca.res$mu
-    muj.argvals        <- mfpca.res$eta
+    # mu0.argvals        <- mfpca.res$mu
+    # muj.argvals        <- mfpca.res$eta
   }
 
   fixef.design.mx <- model.matrix(formula.fixef, data)
@@ -396,14 +396,14 @@ fli <- function(
     M         = min(mfpca.res.npc_l2, mfpca.pars$npc_l2),
     ylen      = length(nonna.idx), # number of non-NA observations
     p         = p, # dimension of fixed effect
-    visit     = as.integer(data[[var.names$visit_name]][nonna.idx]), # pass factor as integer;
+    # visit     = as.integer(data[[var.names$visit_name]][nonna.idx]), # pass factor as integer;
     nvisits   = nvisits$nvisits,
     non_na    = nonna.idx,
     y         = data[[model_formula[[2]]]][nonna.idx], # STAN does not accept NA
     X         = fixef.design.mx[nonna.idx, , drop = F],
     betaHat   = betaHat.argvals,
-    mu_0      = mu0.argvals,
-    mu_j      = muj.argvals,
+    # mu_0      = mu0.argvals,
+    # mu_j      = muj.argvals,
     efuncs_l1 = t(deigfun.l1.argvals),
     efuncs_l2 = t(deigfun.l2.argvals),
     grainsize = 1
@@ -493,10 +493,10 @@ fli <- function(
       id_visit  = id.visit,
       betaTilde = betaTilde,
       betaHat   = betaHat,
-      betaSE    = betaSE,
+      # betaSE    = betaSE,
       localglmm = massmm,
-      mu0_mfpca = mu0.argvals,
-      muj_mfpca = muj.argvals,
+      # mu0_mfpca = mu0.argvals,
+      # muj_mfpca = muj.argvals,
       # beta_posterior = beta.posterior,
       # beta_post_mean = beta.post.mean,
       efunctions = list(

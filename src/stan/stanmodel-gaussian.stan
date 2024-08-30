@@ -16,14 +16,14 @@ data {
   int<lower=0>            M;           // number of level 2 eigenfunctions
   int<lower=0>            ylen;        // Length of the outcome vector in long format
   int<lower=0>            p;           // number of columns in the fixed effect design matrix
-  array[ylen] int         visit;       // a vector of the visit variable
+  // array[ylen] int         visit;       // a vector of the visit variable
   array[Nsubs] int        nvisits;     // a vector of the number of repeated functions within individuals
   array[ylen] int         non_na;      // indices of non-NA values in the original data.
   array[ylen] real        y;           // outcome (Gaussian functional data) in long format
   matrix[ylen, p]         X;           // design matrix for fixed effects
   matrix[p,S]             betaHat;     // smoothed fixed effect estimates.
-  row_vector[S]           mu_0;        // population mean, from MFPCA
-  matrix[S, max(nvisits)] mu_j;        // visit specific shift from overall mean, from MFPCA
+  // row_vector[S]           mu_0;        // population mean, from MFPCA
+  // matrix[S, max(nvisits)] mu_j;        // visit specific shift from overall mean, from MFPCA
   matrix[L,S]             efuncs_l1;   // level 1 eigen functions
   matrix[M,S]             efuncs_l2;   // level 2 eigen functions
   int<lower=1>            grainsize;
@@ -72,11 +72,7 @@ model {
   // tau2            ~ gamma(1e-6, 1e-6);
   // taue            ~ gamma(1e-6, 1e-6);
 
-  // New implementation
   eta_mat_i = xil1_sc * efuncs_l1;
-  for(i in 1:Nsubs){
-     eta_mat_i[i, ] = eta_mat_i[i, ] + mu_0;
-  }
   eta_mat_ij = xil2_sc * efuncs_l2;
   inx = 1;
   for(i in 1:Nsubs){
