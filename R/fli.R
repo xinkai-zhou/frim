@@ -324,7 +324,8 @@ fli <- function(
     id = id.visit$id,
     visit = id.visit$visit,
     argvals = bin.pars$bin_midpoints,
-    pve = mfpca.pars$pve
+    pve = mfpca.pars$pve,
+    twoway = FALSE # do not estimate visit-specific shift
   )
   mfpca.res.npc_l1 <- ncol(mfpca.res$efunctions$level1)
   mfpca.res.npc_l2 <- ncol(mfpca.res$efunctions$level2)
