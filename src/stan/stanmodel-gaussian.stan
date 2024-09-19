@@ -65,9 +65,12 @@ model {
   // priors
   to_vector(xil1) ~ normal(0,1);
   to_vector(xil2) ~ normal(0,1);
-  sigmal1sq       ~ inv_gamma(0.01, 0.01);
-  sigmal2sq       ~ inv_gamma(0.01, 0.01);
-  sigma_epi_sq    ~ inv_gamma(0.01, 0.01);
+  sigmal1sq       ~ normal(0,1);
+  sigmal2sq       ~ normal(0,1);
+  sigma_epi_sq    ~ normal(0,1);
+  // sigmal1sq       ~ inv_gamma(0.01, 0.01);
+  // sigmal2sq       ~ inv_gamma(0.01, 0.01);
+  // sigma_epi_sq    ~ inv_gamma(0.01, 0.01);
   // tau1            ~ gamma(1e-6, 1e-6);
   // tau2            ~ gamma(1e-6, 1e-6);
   // taue            ~ gamma(1e-6, 1e-6);

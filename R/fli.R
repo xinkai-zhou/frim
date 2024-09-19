@@ -73,7 +73,8 @@ fli <- function(
       pve = 0.99,
       npc_l1 = 4,
       npc_l2 = 4,
-      visit.levels = NULL
+      visit.levels = NULL,
+      twoway = F
     ),
     stan.pars = list(
       iter_warmup = 1000,
@@ -325,7 +326,7 @@ fli <- function(
     visit = id.visit$visit,
     argvals = bin.pars$bin_midpoints,
     pve = mfpca.pars$pve,
-    twoway = FALSE # do not estimate visit-specific shift
+    twoway = mfpca.pars$twoway
   )
   mfpca.res.npc_l1 <- ncol(mfpca.res$efunctions$level1)
   mfpca.res.npc_l2 <- ncol(mfpca.res$efunctions$level2)
