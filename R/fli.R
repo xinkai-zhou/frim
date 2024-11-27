@@ -89,7 +89,8 @@ fli <- function(
     ci.level = 0.95,
     parallel = FALSE,
     silent = FALSE,
-    num_cores = 1
+    num_cores = 1,
+    skip_STAN = FALSE
     ){
 
   # If doing parallel computing, set up the number of cores
@@ -231,7 +232,10 @@ fli <- function(
     re.df <- dref %>%
       dplyr::left_join(re.df.id, by = var.names$id_name) %>%
       dplyr::left_join(re.df.id.visit, by = c(var.names$id_name, var.names$visit_name)) %>%
-      mutate(re = re_id + re_id_visit)
+      # If data is completely missing for a visit in a bin, then re_id_visit is NA
+      # The best prediction for re_id_visit is 0.
+      # i.e., we use re_id as the subject-visit-specific ranef prediction for that bin.
+      mutate(re = ifelse(is.na(re_id_visit), re_id, re_id + re_id_visit))
     # se_mat <- summary(fit_uni)$coefficients[, "Std. Error"] ## se of fixed effects
     model_matrix = dref %>%
       left_join(cbind(
@@ -334,13 +338,6 @@ fli <- function(
   # mfpca.res <- read_rds(paste0(res.path, "mfpca.rds"))
   # mfpca.res <- read_rds("results/sim/mfpca.rds")
 
-  ##############################################################################
-  ## Step 4 Run STAN
-  ##############################################################################
-  if(!silent) print("Step 4: STAN")
-  # deigfun.l1.argvals <- mfpca.res$efunctions$level1[, 1:mfpca.pars$npc_l1]
-  # deigfun.l2.argvals <- mfpca.res$efunctions$level2[, 1:mfpca.pars$npc_l2]
-
   if(length(bin.pars$bin_midpoints) < length(argvals)){
     # Project eigenfunctions back to the full grid
     deigfun.l1.argvals <- reeval_efunctions(
@@ -387,6 +384,44 @@ fli <- function(
     # mu0.argvals        <- mfpca.res$mu
     # muj.argvals        <- mfpca.res$eta
   }
+
+  if(skip_STAN){
+    # For large N (sample size), one can divide the full data into subsets for score sampling.
+    # Since all subsets condition on the same set of eigenfunctions from MFPCA,
+    # scores are still comparable.
+    return(
+      list(
+        argvals   = argvals,
+        bin_idx   = bin.index,
+        id_visit  = id.visit,
+        betaTilde = betaTilde,
+        betaHat   = betaHat,
+        # betaSE    = betaSE,
+        localglmm = massmm,
+        # mu0_mfpca = mu0.argvals,
+        # muj_mfpca = muj.argvals,
+        # beta_posterior = beta.posterior,
+        # beta_post_mean = beta.post.mean,
+        evalues = mfpca.res$evalues,
+        efunctions = list(
+          level1 = deigfun.l1.argvals,
+          level2 = deigfun.l2.argvals
+        ),
+        scores_posterior = NULL,
+        scores_postmean = NULL,
+        stanfit = NULL,
+        ci.level = ci.level
+      )
+    )
+  }
+
+  ##############################################################################
+  ## Step 5 Use STAN to sample scores
+  ##############################################################################
+
+  if(!silent) print("Step 4: STAN")
+  # deigfun.l1.argvals <- mfpca.res$efunctions$level1[, 1:mfpca.pars$npc_l1]
+  # deigfun.l2.argvals <- mfpca.res$efunctions$level2[, 1:mfpca.pars$npc_l2]
 
   fixef.design.mx <- model.matrix(formula.fixef, data)
   nonna.idx <- which(!is.na(data[[model_formula[[2]]]]))
@@ -501,6 +536,7 @@ fli <- function(
       # muj_mfpca = muj.argvals,
       # beta_posterior = beta.posterior,
       # beta_post_mean = beta.post.mean,
+      evalues = mfpca.res$evalues,
       efunctions = list(
         level1 = deigfun.l1.argvals,
         level2 = deigfun.l2.argvals

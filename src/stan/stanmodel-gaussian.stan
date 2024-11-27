@@ -1,13 +1,13 @@
-functions {
-  real partial_sum(array[] real y, int start, int end, vector eta, real sigma_epi_sq) {
-    return normal_lpdf(y | eta[start:end], sqrt(sigma_epi_sq));
-  }
-}
 // functions {
-//   real partial_sum(array[] real y, int start, int end, vector eta, real taue) {
-//     return normal_lpdf(y | eta[start:end], 1/sqrt(taue));
+//   real partial_sum(array[] real y, int start, int end, vector eta, real sigma_epi_sq) {
+//     return normal_lpdf(y | eta[start:end], sqrt(sigma_epi_sq));
 //   }
 // }
+functions {
+  real partial_sum(array[] real y, int start, int end, vector eta, real taue) {
+    return normal_lpdf(y | eta[start:end], 1 / sqrt(taue));
+  }
+}
 data {
   int<lower=0>            Nsubs;       // number of individuals (first level)
   int<lower=0>            Nfuns;       // number of observed functions
@@ -32,28 +32,28 @@ parameters {
   // matrix[p, S]    beta;             // fixed effect parameter
   matrix[Nsubs, L]   xil1;             // level 1 random effects
   matrix[Nfuns, M]   xil2;             // level 2 random effects
-  vector<lower=0>[L] sigmal1sq;        // sd of the random intercept term
-  vector<lower=0>[M] sigmal2sq;        // sd of the random intercept term
-  real<lower=0>      sigma_epi_sq;     // sd of the error term
-  // vector<lower=0>[L] tau1; // precision of level 1 scores
-  // vector<lower=0>[M] tau2; // precision of level 2 scores
-  // real<lower=0>      taue; // precision for noise
+  // vector<lower=0>[L] sigmal1sq;        // var of the random intercept term
+  // vector<lower=0>[M] sigmal2sq;        // var of the random intercept term
+  // real<lower=0>      sigma_epi_sq;     // var of the error term
+  vector<lower=0>[L] tau1; // precision of level 1 scores
+  vector<lower=0>[M] tau2; // precision of level 2 scores
+  real<lower=0>      taue; // precision for noise
 }
 transformed parameters {
   matrix[Nsubs, L] xil1_sc;            // level 1 random effects
   matrix[Nfuns, M] xil2_sc;            // level 2 random effects
-  for(l in 1:L){
-      xil1_sc[,l] = xil1[,l] * sqrt(sigmal1sq[l]);
-  }
-  for(m in 1:M){
-      xil2_sc[,m] = xil2[,m] * sqrt(sigmal2sq[m]);
-  }
   // for(l in 1:L){
-  //     xil1_sc[,l] = xil1[,l] / sqrt(tau1[l]);
+  //     xil1_sc[,l] = xil1[,l] * sqrt(sigmal1sq[l]);
   // }
   // for(m in 1:M){
-  //     xil2_sc[,m] = xil2[,m] / sqrt(tau2[m]);
+  //     xil2_sc[,m] = xil2[,m] * sqrt(sigmal2sq[m]);
   // }
+  for(l in 1:L){
+      xil1_sc[,l] = xil1[,l] / sqrt(tau1[l]);
+  }
+  for(m in 1:M){
+      xil2_sc[,m] = xil2[,m] / sqrt(tau2[m]);
+  }
 }
 model {
   int inx;
@@ -65,15 +65,12 @@ model {
   // priors
   to_vector(xil1) ~ normal(0,1);
   to_vector(xil2) ~ normal(0,1);
-  sigmal1sq       ~ normal(0,1);
-  sigmal2sq       ~ normal(0,1);
-  sigma_epi_sq    ~ normal(0,1);
   // sigmal1sq       ~ inv_gamma(0.01, 0.01);
   // sigmal2sq       ~ inv_gamma(0.01, 0.01);
   // sigma_epi_sq    ~ inv_gamma(0.01, 0.01);
-  // tau1            ~ gamma(1e-6, 1e-6);
-  // tau2            ~ gamma(1e-6, 1e-6);
-  // taue            ~ gamma(1e-6, 1e-6);
+  tau1            ~ cauchy(0,1);
+  tau2            ~ cauchy(0,1);
+  taue            ~ cauchy(0,1);
 
   eta_mat_i = xil1_sc * efuncs_l1;
   eta_mat_ij = xil2_sc * efuncs_l2;
@@ -88,6 +85,6 @@ model {
   }
   eta_vec = to_vector((eta_mat_ij)')[non_na];
 
-  target += reduce_sum(partial_sum, y, grainsize, eta_vec, sigma_epi_sq);
-  // target += reduce_sum(partial_sum, y, grainsize, eta_vec, taue);
+  // target += reduce_sum(partial_sum, y, grainsize, eta_vec, sigma_epi_sq);
+  target += reduce_sum(partial_sum, y, grainsize, eta_vec, taue);
 }
