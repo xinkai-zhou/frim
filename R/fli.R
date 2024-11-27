@@ -90,6 +90,7 @@ fli <- function(
     parallel = FALSE,
     silent = FALSE,
     num_cores = 1,
+    use_complete_visits = TRUE,
     skip_STAN = FALSE
     ){
 
@@ -232,10 +233,15 @@ fli <- function(
     re.df <- dref %>%
       dplyr::left_join(re.df.id, by = var.names$id_name) %>%
       dplyr::left_join(re.df.id.visit, by = c(var.names$id_name, var.names$visit_name)) %>%
-      # If data is completely missing for a visit in a bin, then re_id_visit is NA
-      # The best prediction for re_id_visit is 0.
-      # i.e., we use re_id as the subject-visit-specific ranef prediction for that bin.
-      mutate(re = ifelse(is.na(re_id_visit), re_id, re_id + re_id_visit))
+      # Approach 1: if re_id_visit is missing, then re is missing
+      mutate(re = re_id + re_id_visit)
+
+      # # Approach 2: use re_id to impute when re_id_visit is missing
+      # # If data is completely missing for a visit in a bin, then re_id_visit is NA
+      # # The best prediction for re_id_visit is 0.
+      # # i.e., we use re_id as the subject-visit-specific ranef prediction for that bin.
+      # mutate(re = ifelse(is.na(re_id_visit), re_id, re_id + re_id_visit))
+
     # se_mat <- summary(fit_uni)$coefficients[, "Std. Error"] ## se of fixed effects
     model_matrix = dref %>%
       left_join(cbind(
@@ -324,14 +330,30 @@ fli <- function(
     id = sapply(id.visit, function(x) as.integer(x[1])),
     visit = sapply(id.visit, function(x) as.integer(x[2]))
   )
-  mfpca.res <- refund::mfpca.face(
-    randEff,
-    id = id.visit$id,
-    visit = id.visit$visit,
-    argvals = bin.pars$bin_midpoints,
-    pve = mfpca.pars$pve,
-    twoway = mfpca.pars$twoway
-  )
+
+  if(use_complete_visits){
+    # Approach 2: only use visits with complete observations
+    visit.no.missing <- apply(randEff, MARGIN = 1, function(x) all(!is.na(x)))
+    mfpca.res <- refund::mfpca.face(
+      randEff[visit.no.missing, ],
+      id = id.visit$id[visit.no.missing],
+      visit = id.visit$visit[visit.no.missing],
+      argvals = bin.pars$bin_midpoints,
+      pve = mfpca.pars$pve,
+      twoway = mfpca.pars$twoway
+    )
+  } else {
+    # Approach 1: use all visits
+    mfpca.res <- refund::mfpca.face(
+      randEff,
+      id = id.visit$id,
+      visit = id.visit$visit,
+      argvals = bin.pars$bin_midpoints,
+      pve = mfpca.pars$pve,
+      twoway = mfpca.pars$twoway
+    )
+  }
+
   mfpca.res.npc_l1 <- ncol(mfpca.res$efunctions$level1)
   mfpca.res.npc_l2 <- ncol(mfpca.res$efunctions$level2)
   if(dir.path$save_intermediate_res) saveRDS(mfpca.res, paste0(res.path, "mfpca.rds"))
