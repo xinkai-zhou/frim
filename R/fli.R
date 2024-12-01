@@ -90,6 +90,7 @@ fli <- function(
     parallel = FALSE,
     silent = FALSE,
     num_cores = 1,
+    impute_NA = FALSE,
     use_complete_visits = TRUE,
     skip_STAN = FALSE
     ){
@@ -198,7 +199,7 @@ fli <- function(
   ### Input: l: index of the list bin.index.
   ###           Each element in the list is a vector containing domain points for that bin.
   ### Output: A list containing point estimates, variance estimates, etc.
-  unimm <- function(l){
+  unimm <- function(l, impute_NA){
     dtemp <- data %>% dplyr::filter(.data[[var.names$domain_name]] %in% l)
     if(family == "gaussian"){
       fit_uni <- suppressMessages(
@@ -232,15 +233,19 @@ fli <- function(
     ) %>% setNames(c(var.names$id_name, var.names$visit_name, "re_id_visit"))
     re.df <- dref %>%
       dplyr::left_join(re.df.id, by = var.names$id_name) %>%
-      dplyr::left_join(re.df.id.visit, by = c(var.names$id_name, var.names$visit_name)) %>%
+      dplyr::left_join(re.df.id.visit, by = c(var.names$id_name, var.names$visit_name))
+    if(!impute_NA){
       # Approach 1: if re_id_visit is missing, then re is missing
-      mutate(re = re_id + re_id_visit)
+      re.df <- re.df %>% mutate(re = re_id + re_id_visit)
+    } else {
+      # Approach 2: missing values in re_id_visit are imputed with 0
+      # If data is completely missing for a visit in a bin, then re_id_visit is NA
+      # The best prediction for re_id_visit is 0.
+      # i.e., we use re_id as the subject-visit-specific ranef prediction for that bin.
+      re.df <- re.df %>%
+        mutate(re = ifelse(is.na(re_id_visit), re_id, re_id + re_id_visit))
+    }
 
-      # # Approach 2: use re_id to impute when re_id_visit is missing
-      # # If data is completely missing for a visit in a bin, then re_id_visit is NA
-      # # The best prediction for re_id_visit is 0.
-      # # i.e., we use re_id as the subject-visit-specific ranef prediction for that bin.
-      # mutate(re = ifelse(is.na(re_id_visit), re_id, re_id + re_id_visit))
 
     # se_mat <- summary(fit_uni)$coefficients[, "Std. Error"] ## se of fixed effects
     model_matrix = dref %>%
