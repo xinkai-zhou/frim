@@ -92,7 +92,8 @@ fli <- function(
     num_cores = 1,
     impute_NA = FALSE,
     use_complete_visits = TRUE,
-    skip_STAN = FALSE
+    skip_STAN = FALSE,
+    n.subsets = 5
     ){
 
   # If doing parallel computing, set up the number of cores
@@ -272,9 +273,9 @@ fli <- function(
   }
   # Fit massively univariate mixed models
   if(parallel == TRUE){
-    massmm <- parallel::mclapply(bin.index, unimm, mc.cores = num_cores)
+    massmm <- parallel::mclapply(bin.index, unimm, impute_NA = impute_NA, mc.cores = num_cores)
   }else{
-    massmm <- lapply(bin.index, unimm)
+    massmm <- lapply(bin.index, unimm, impute_NA = impute_NA)
   }
   if(dir.path$save_intermediate_res) saveRDS(massmm, paste0(res.path, "univariate-mixed-models.rds"))
   # massmm <- read_rds(paste0(res.path, "univariate-mixed-models.rds"))
@@ -416,30 +417,74 @@ fli <- function(
     # For large N (sample size), one can divide the full data into subsets for score sampling.
     # Since all subsets condition on the same set of eigenfunctions from MFPCA,
     # scores are still comparable.
-    return(
-      list(
-        argvals   = argvals,
-        bin_idx   = bin.index,
-        id_visit  = id.visit,
-        betaTilde = betaTilde,
-        betaHat   = betaHat,
-        # betaSE    = betaSE,
-        localglmm = massmm,
-        # mu0_mfpca = mu0.argvals,
-        # muj_mfpca = muj.argvals,
-        # beta_posterior = beta.posterior,
-        # beta_post_mean = beta.post.mean,
-        evalues = mfpca.res$evalues,
-        efunctions = list(
-          level1 = deigfun.l1.argvals,
-          level2 = deigfun.l2.argvals
-        ),
-        scores_posterior = NULL,
-        scores_postmean = NULL,
-        stanfit = NULL,
-        ci.level = ci.level
+    Nsubjects <- length(id.unique)
+    subset.idx <- rep(1:n.subsets, length.out = Nsubjects)
+
+    for(sidx in 1:n.subsets){
+      if(!(dir.exists(dir.path$intermediate_res_path))){
+        dir.create(dir.path$intermediate_res_path, recursive = T)
+      }
+      ids.subset <- id.unique[subset.idx == sidx]
+      saveRDS(ids.subset, file = paste0(dir.path$intermediate_res_path, "ids-part", sidx, ".RDS"))
+
+      data.subset    <- filter(data, .data[[var.names$id_name]] %in% ids.subset)
+      nvisits.subset <- filter(nvisits, .data[[var.names$id_name]] %in% ids.subset)
+      # This may cause issues if certain factor levels are missing in a subset
+      # But it would only happen when sample size is small, when skip_STAN is not necessary.
+      fixef.design.mx.subset <- model.matrix(formula.fixef, data.subset)
+      nonna.idx.subset <- which(!is.na(data.subset[[model_formula[[2]]]]))
+
+      standata <- list(
+        Nsubs     = length(ids.subset),
+        Nfuns     = sum(nvisits.subset$nvisits),
+        S         = length(argvals),
+        L         = min(mfpca.res.npc_l1, mfpca.pars$npc_l1),
+        M         = min(mfpca.res.npc_l2, mfpca.pars$npc_l2),
+        ylen      = length(nonna.idx.subset), # number of non-NA observations
+        p         = p, # dimension of fixed effect
+        # visit     = as.integer(data[[var.names$visit_name]][nonna.idx.subset]), # pass factor as integer;
+        nvisits   = nvisits.subset$nvisits,
+        non_na    = nonna.idx.subset,
+        y         = data.subset[[model_formula[[2]]]][nonna.idx.subset], # STAN does not accept NA
+        X         = fixef.design.mx.subset[nonna.idx.subset, , drop = F],
+        betaHat   = betaHat.argvals,
+        # mu_0      = mu0.argvals,
+        # mu_j      = muj.argvals,
+        efuncs_l1 = t(deigfun.l1.argvals),
+        efuncs_l2 = t(deigfun.l2.argvals),
+        grainsize = 1
       )
+      write_stan_json(
+        standata,
+        file = paste0(dir.path$intermediate_res_path, "standata-part", sidx, ".json"),
+        always_decimal = FALSE
+      )
+    }
+    print(paste0("Data for STAN are saved to: ", dir.path$intermediate_res_path))
+    print("Run ... to sample scores. ")
+    fli.res <- list(
+      argvals   = argvals,
+      bin_idx   = bin.index,
+      id_visit  = id.visit,
+      betaTilde = betaTilde,
+      betaHat   = betaHat,
+      # betaSE    = betaSE,
+      localglmm = massmm,
+      # mu0_mfpca = mu0.argvals,
+      # muj_mfpca = muj.argvals,
+      # beta_posterior = beta.posterior,
+      # beta_post_mean = beta.post.mean,
+      evalues = mfpca.res$evalues,
+      efunctions = list(
+        level1 = deigfun.l1.argvals,
+        level2 = deigfun.l2.argvals
+      ),
+      scores_posterior = NULL,
+      scores_postmean = NULL,
+      stanfit = NULL,
+      ci.level = ci.level
     )
+    return(fli.res)
   }
 
   ##############################################################################
