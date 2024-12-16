@@ -42,7 +42,17 @@ stanfit <- stanmodel$sample(
   refresh =  as.integer(args.parsed$refresh)
 )
 toc <- Sys.time()
-toc - tic
+
+dtime <- data.frame(
+  runtime = difftime(time1 = toc, time2 = tic, units = "secs"),
+  split_idx = sidx,
+  step = "step4"
+)
+write.table(
+  dtime, file = paste0(standata.path, "runtime.csv"),
+  quote = F, sep = ",", append = T, row.names = F, col.names = F
+)
+
 saveRDS(stanfit, file = paste0(standata.path, "stanfit-part", sidx, ".rds"))
 
 draws.df <- stanfit$draws(format = "df")

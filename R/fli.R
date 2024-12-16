@@ -425,7 +425,7 @@ fli <- function(
         dir.create(dir.path$intermediate_res_path, recursive = T)
       }
       ids.subset <- id.unique[subset.idx == sidx]
-      saveRDS(ids.subset, file = paste0(dir.path$intermediate_res_path, "ids-part", sidx, ".RDS"))
+      saveRDS(ids.subset, file = paste0(dir.path$intermediate_res_path, "ids-part", sidx, ".rds"))
 
       data.subset    <- filter(data, .data[[var.names$id_name]] %in% ids.subset)
       nvisits.subset <- filter(nvisits, .data[[var.names$id_name]] %in% ids.subset)
