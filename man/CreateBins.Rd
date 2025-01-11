@@ -10,6 +10,10 @@ CreateBins(argvals, bin_midpoints, bin_len, cyclic = F)
 \item{argvals}{A vector containing locations of observations on the
 functional domain.}
 
+\item{bin_midpoints}{Centers of the bins.}
+
+\item{bin_len}{Length of the bin. In the same unit as argvals.}
+
 \item{cyclic}{}
 }
 \description{

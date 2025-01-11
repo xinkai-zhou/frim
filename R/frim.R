@@ -1,54 +1,79 @@
-#' Fast Local Inference for Longitudinal Functional Models
+#' Functional Random Effect Inference for Generalized Functional Mixed Models
 #'
 #'
-#' The FLI approach comprises of five steps:
+#' The frim approach comprises of the following steps:
 #' \enumerate{
-#' \item Divide the domain into bins;
-#' \item Fit a mixed model in each bin and obtain fixed effect estimates;
-#' \item Smooth fixed effect estimates along the functional domain;
-#' \item Apply multilevel FPCA on residuals and obtain eigenfunctions;
-#' \item Get posterior samples of scores using the Bayesian method.
+#' \item Fit local GLMMs, smooth local fixed effect estimates, and extract local random effects;
+#' \item Apply multilevel FPCA on the adjusted local random effects to obtain eigenfunctions;
+#' \item Fit a global Bayesian multilevel model to sample scores.
 #' }
 #'
-#' For more information on each step, please refer to the FLI paper.
+#' For more information on each step, please refer to the FRIM paper.
 #'
-#' @param formula Two-sided formula object in lme4 formula syntax.
+#' @param formula Two-sided formula object for the functional mixed model in the lme4 formula syntax.
 #' The visit variable should be included as a fixed effect covariate.
-#' @param formula.fixef Formula for the fixed effect. WILL CHANGE LATER.
-#' @param data A data frame in long format
-#' @param family GLM family of the response. Defaults to \code{gaussian}.
-#' @param parallel Logical, indicating whether to do parallel computing.
-#' Defaults to \code{FALSE}.
-#' @param silent Logical, indicating whether to show descriptions of each step.
-#' Defaults to \code{FALSE}.
+#' @param formula.fixef Formula for just the fixed effect.
+#' @param data A data frame in the long format.
+#' @param family Distribution family of the response. Default to \code{gaussian}.
 #' @param argvals A vector containing locations of observations on the
 #' functional domain. If not specified, a regular grid across the range of
 #' the domain is assumed. Currently only supported for bootstrap (\code{analytic=FALSE}).
-#' @param smoothing.pars.nknots_min Minimal number of knots in the penalized smoothing for the regression coefficients.
+#' @param bin.pars A named list specifying the bin midpoints (\code{bin_midpoints}), bin length (\code{bin_len}),
+#' and whether bins are cyclic.
+#' @param var.names A named list specifying the names of the id, visit, and domain name in the \code{data} object.
+#' @param smoothing.pars A named list with components:
+#' \code{nknots_min}: the minimal number of knots in the penalized smoothing for the regression coefficients.
 #' Defaults to \code{NULL}, which then uses L/2 where L is the dimension of the functional domain.
-#' @param smoothing.pars$nknots_min_cov Minimal number of knots in the penalized smoothing for the covariance matrices.
-#' Defaults to \code{35}.
-#' @param smoothing.pars$smooth_method How to select smoothing parameter in step 2. Defaults to \code{"GCV.Cp"}
-#' @param splines Spline type used for penalized splines smoothing. We use the same syntax
-#' as the mgcv package. Defaults to \code{"tp"}
-#' @param num_cores Number of cores for parallelization. Defaults to 1.
+#' \code{smooth_method}: method for selecting smoothing parameter in step 2. Defaults to \code{"GCV.Cp"}
+#' \code{splines}: spline type used for penalized splines smoothing. We use the same syntax as the mgcv package. Defaults to \code{"tp"}
+#' @param mfpca.pars A named list with components:
+#' \code{pve}: the proportion of variance explained by the eigenfunctions. Defaults to \code{0.99}.
+#' \code{npc_l1}: number of eigenfunctions for level 1. Defaults to \code{4}.
+#' \code{npc_l2}: number of eigenfunctions for level 2. Defaults to \code{4}.
+#' \code{visit.levels}: levels of the visit variable. Defaults to \code{NULL}.
+#' \code{twoway}: logical, indicating whether to use two-way MFPCA. Defaults to \code{FALSE}.
+#' @param stan.pars A named list with components:
+#' \code{iter_warmup}: number of warmup iterations. Defaults to \code{1000}.
+#' \code{iter_sampling}: number of sampling iterations. Defaults to \code{2000}.
+#' \code{chains}: number of chains. Defaults to \code{4}.
+#' \code{refresh}: number of iterations between progress updates. Defaults to \code{100}.
+#' @param dir.path A named list with components:
+#' \code{save_intermediate_res}: logical, indicating whether to save intermediate results. Defaults to \code{FALSE}.
+#' \code{intermediate_res_path}: path to save intermediate results. Defaults to \code{"results/sim/"}.
+#' @param ci.level Confidence level for credible intervals. Defaults to \code{0.95}.
+#' @param parallel Logical, indicating whether to fit local GLMMs in parallel. Defaults to \code{TRUE}.
+#' @param silent Logical, indicating whether to show descriptions of each step. Defaults to \code{TRUE}.
+#' @param num_cores Number of cores for parallel fitting of local GLMMs. Defaults to 1.
+#' @param use_complete_visits Logical, indicating whether to use visits with complete observations for estimating eigenfunctions. Defaults to \code{TRUE}.
+#' @param skip_STAN Logical, indicating whether to skip STAN sampling. Defaults to \code{FALSE}.
+#' @param n.subsets Number of subsets to divide the full data for STAN sampling. Ignored if \code{skip_STAN} is FALSE. Defaults to \code{5}.
 #'
 #' @return A list containing:
-#' \item{...}{...}
+#' \item{argvals}{A vector containing locations of observations on the functional domain.}
+#' \item{bin_idx}{A list of bins.}
+#' \item{id_visit}{A data frame containing the id and visit variables.}
+#' \item{betaTilde}{Matrix of local fixed effect estimates.}
+#' \item{betaHat}{Matrix of smoothed fixed effect estimates.}
+#' \item{localglmm}{List of local GLMM fits.}
+#' \item{evalues}{Eigenvalues of the MFPCA.}
+#' \item{efunctions}{List of eigenfunctions.}
+#' \item{scores_posterior}{List of posterior samples of scores.}
+#' \item{scores_postmean}{List of posterior means of scores.}
+#' \item{stanfit}{STAN fit object.}
+#' \item{ci.level}{Confidence level for credible intervals.}
 #'
-#' @references
 #'
 #' @import dplyr
 #' @import cmdstanr
 #'
-#' @export fli
+#' @export frim
 #'
 #' @examples
 #' set.seed(1)
-#' fit_nhanes <- fli(value ~ age + gender + (1|id) + (1|id:visit),
+#' fit_nhanes <- frim(value ~ age + gender + (1|id) + (1|id:visit),
 #'                  data = nhanes_example)
 
-fli <- function(
+frim <- function(
     formula,
     formula.fixef,
     data,
@@ -87,10 +112,9 @@ fli <- function(
       intermediate_res_path = "results/sim/"
     ),
     ci.level = 0.95,
-    parallel = FALSE,
+    parallel = TRUE,
     silent = FALSE,
-    num_cores = 1,
-    impute_NA = FALSE,
+    num_cores = 4,
     use_complete_visits = TRUE,
     skip_STAN = FALSE,
     n.subsets = 5
@@ -200,7 +224,7 @@ fli <- function(
   ### Input: l: index of the list bin.index.
   ###           Each element in the list is a vector containing domain points for that bin.
   ### Output: A list containing point estimates, variance estimates, etc.
-  unimm <- function(l, impute_NA){
+  unimm <- function(l){
     dtemp <- data %>% dplyr::filter(.data[[var.names$domain_name]] %in% l)
     if(family == "gaussian"){
       fit_uni <- suppressMessages(
@@ -235,17 +259,17 @@ fli <- function(
     re.df <- dref %>%
       dplyr::left_join(re.df.id, by = var.names$id_name) %>%
       dplyr::left_join(re.df.id.visit, by = c(var.names$id_name, var.names$visit_name))
-    if(!impute_NA){
-      # Approach 1: if re_id_visit is missing, then re is missing
-      re.df <- re.df %>% mutate(re = re_id + re_id_visit)
-    } else {
-      # Approach 2: missing values in re_id_visit are imputed with 0
-      # If data is completely missing for a visit in a bin, then re_id_visit is NA
-      # The best prediction for re_id_visit is 0.
-      # i.e., we use re_id as the subject-visit-specific ranef prediction for that bin.
-      re.df <- re.df %>%
+    # if(!impute_NA){
+    #   # Approach 1: if re_id_visit is missing, then re is missing
+    #   re.df <- re.df %>% mutate(re = re_id + re_id_visit)
+    # } else {
+    #   # Approach 2: missing values in re_id_visit are imputed with 0
+    #   # If data is completely missing for a visit in a bin, then re_id_visit is NA
+    #   # The best prediction for re_id_visit is 0.
+    #   # i.e., we use re_id as the subject-visit-specific ranef prediction for that bin.
+    re.df <- re.df %>%
         mutate(re = ifelse(is.na(re_id_visit), re_id, re_id + re_id_visit))
-    }
+    # }
 
 
     # se_mat <- summary(fit_uni)$coefficients[, "Std. Error"] ## se of fixed effects
@@ -273,9 +297,9 @@ fli <- function(
   }
   # Fit massively univariate mixed models
   if(parallel == TRUE){
-    massmm <- parallel::mclapply(bin.index, unimm, impute_NA = impute_NA, mc.cores = num_cores)
+    massmm <- parallel::mclapply(bin.index, unimm, mc.cores = num_cores)
   }else{
-    massmm <- lapply(bin.index, unimm, impute_NA = impute_NA)
+    massmm <- lapply(bin.index, unimm)
   }
   if(dir.path$save_intermediate_res) saveRDS(massmm, paste0(res.path, "univariate-mixed-models.rds"))
   # massmm <- read_rds(paste0(res.path, "univariate-mixed-models.rds"))
@@ -462,7 +486,7 @@ fli <- function(
     }
     print(paste0("Data for STAN are saved to: ", dir.path$intermediate_res_path))
     print("Run ... to sample scores. ")
-    fli.res <- list(
+    frim.res <- list(
       argvals   = argvals,
       bin_idx   = bin.index,
       id_visit  = id.visit,
@@ -484,7 +508,7 @@ fli <- function(
       stanfit = NULL,
       ci.level = ci.level
     )
-    return(fli.res)
+    return(frim.res)
   }
 
   ##############################################################################
@@ -527,7 +551,7 @@ fli <- function(
 
   # standata <- jsonlite::read_json("results/sim/standata.json")
   # set_cmdstan_path(dir.path$cmdstan_installation_path)
-  # stanmodel <- system.file(paste0("stanmodel-", family), package = "fli")
+  # stanmodel <- system.file(paste0("stanmodel-", family), package = "frim")
   # model_parallel <- cmdstanr::cmdstan_model(exe_file = stanmodel)
   # if(file.exists(stanmodel)){
   # } else {
@@ -538,7 +562,7 @@ fli <- function(
 
   # new way, using {instantiate}
   stanmodel <- instantiate::stan_package_model(
-    name = paste0("stanmodel-", family), package = "fli"
+    name = paste0("stanmodel-", family), package = "frim"
   )
   tic <- Sys.time()
   stanfit <- stanmodel$sample(
@@ -628,7 +652,7 @@ fli <- function(
 }
 
 
-# fli.res <- list(
+# frim.res <- list(
 #   argvals  = argvals,
 #   id_visit = id.visit,
 #   betaHat  = betaHat,
@@ -698,26 +722,26 @@ fli <- function(
 # )
 
 
-# fli.obj$id_visit <- id.visit
+# frim.obj$id_visit <- id.visit
 # check traceplots
 # plot(l1score.posterior$`xil1_sc[1,1]`, type = "l")
 
-# fli.res$efunctions <- list(
+# frim.res$efunctions <- list(
 #   level1 = deigfun.l1.argvals,
 #   level2 = deigfun.l2.argvals
 # )
-# fli.res$scores_postmean <- scores_postmean
-# fli.res$scores_quantile <- scores_quantile
-# str(fli.res)
+# frim.res$scores_postmean <- scores_postmean
+# frim.res$scores_quantile <- scores_quantile
+# str(frim.res)
 
 
-# fli.res$scores_sd = list(
+# frim.res$scores_sd = list(
 #     ci_level = ci.level,
 #     level1 = l1score.sd,
 #     level2 = l2score.sd
 #   )
 
-# fli.res$scores_posterior = list(
+# frim.res$scores_posterior = list(
 #   level1 = l1score.posterior,
 #   level2 = l2score.posterior
 # )

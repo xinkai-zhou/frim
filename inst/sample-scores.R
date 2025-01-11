@@ -29,7 +29,7 @@ family <- args.parsed$family
 
 standatafile <- paste0(standata.path, "standata-part", sidx, ".json")
 stanmodel <- instantiate::stan_package_model(
-  name = paste0("stanmodel-", family), package = "fli"
+  name = paste0("stanmodel-", family), package = "FRIM"
 )
 tic <- Sys.time()
 stanfit <- stanmodel$sample(
