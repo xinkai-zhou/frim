@@ -102,7 +102,7 @@ test_that("scaled-score names and compatibility aliases are preserved", {
 
 test_that("frim propagates prior_sd_scale into full and split Stan data", {
   runtime_frim <- if ("frim" %in% loadedNamespaces()) {
-    getFromNamespace("frim", "frim")
+    utils::getFromNamespace("frim", "frim")
   } else {
     get("frim", mode = "function", inherits = TRUE)
   }
