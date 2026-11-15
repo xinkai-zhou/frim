@@ -101,11 +101,16 @@ test_that("scaled-score names and compatibility aliases are preserved", {
 })
 
 test_that("frim propagates prior_sd_scale into full and split Stan data", {
-  source <- paste(readLines(testthat::test_path("..", "..", "R", "frim.R"),
-                            warn = FALSE), collapse = "\n")
-  occurrences <- gregexpr("prior_sd_scale = stan.pars$prior_sd_scale", source,
+  runtime_frim <- if ("frim" %in% loadedNamespaces()) {
+    getFromNamespace("frim", "frim")
+  } else {
+    get("frim", mode = "function", inherits = TRUE)
+  }
+  runtime_body <- paste(deparse(body(runtime_frim)), collapse = " ")
+  runtime_body <- gsub("[[:space:]]+", " ", runtime_body)
+  occurrences <- gregexpr("prior_sd_scale = stan.pars$prior_sd_scale", runtime_body,
                           fixed = TRUE)[[1]]
   expect_length(occurrences[occurrences > 0], 2)
-  expect_true(grepl("stan.pars <- .normalize_stan_pars(stan.pars)", source,
+  expect_true(grepl("stan.pars <- .normalize_stan_pars(stan.pars)", runtime_body,
                     fixed = TRUE))
 })
