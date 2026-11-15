@@ -37,6 +37,9 @@
 #' \code{iter_sampling}: number of sampling iterations. Defaults to \code{2000}.
 #' \code{chains}: number of chains. Defaults to \code{4}.
 #' \code{refresh}: number of iterations between progress updates. Defaults to \code{100}.
+#' \code{prior_sd_scale}: shared scale of the half-normal priors on level-1
+#' score SDs, level-2 score SDs, and the Gaussian residual SD. Must be one
+#' finite value greater than zero. Defaults to \code{1}.
 #' @param dir.path A named list with components:
 #' \code{save_intermediate_res}: logical, indicating whether to save intermediate results. Defaults to \code{FALSE}.
 #' \code{intermediate_res_path}: path to save intermediate results. Defaults to \code{"results/sim/"}.
@@ -105,7 +108,8 @@ frim <- function(
       iter_warmup = 1000,
       iter_sampling = 2000,
       chains = 4,
-      refresh = 100
+      refresh = 100,
+      prior_sd_scale = 1
     ),
     dir.path = list(
       save_intermediate_res = FALSE,
@@ -119,6 +123,10 @@ frim <- function(
     skip_STAN = FALSE,
     n.subsets = 5
     ){
+
+  # Merge partial user settings with defaults and validate the prior before any
+  # local-model fitting or file output.
+  stan.pars <- .normalize_stan_pars(stan.pars)
 
   # If doing parallel computing, set up the number of cores
   if(parallel & !is.integer(num_cores)) num_cores <- parallel::detectCores() - 1
@@ -476,6 +484,7 @@ frim <- function(
         # mu_j      = muj.argvals,
         efuncs_l1 = t(deigfun.l1.argvals),
         efuncs_l2 = t(deigfun.l2.argvals),
+        prior_sd_scale = stan.pars$prior_sd_scale,
         grainsize = 1
       )
       write_stan_json(
@@ -539,6 +548,7 @@ frim <- function(
     # mu_j      = muj.argvals,
     efuncs_l1 = t(deigfun.l1.argvals),
     efuncs_l2 = t(deigfun.l2.argvals),
+    prior_sd_scale = stan.pars$prior_sd_scale,
     grainsize = 1
   )
   if(dir.path$save_intermediate_res){

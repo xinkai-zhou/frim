@@ -4,8 +4,8 @@
 //   }
 // }
 functions {
-  real partial_sum(array[] real y, int start, int end, vector eta, real taue) {
-    return normal_lpdf(y | eta[start:end], 1 / sqrt(taue));
+  real partial_sum(array[] real y, int start, int end, vector eta, real sigma_e) {
+    return normal_lpdf(y | eta[start:end], sigma_e);
   }
 }
 data {
@@ -26,33 +26,25 @@ data {
   // matrix[S, max(nvisits)] mu_j;        // visit specific shift from overall mean, from MFPCA
   matrix[L,S]             efuncs_l1;   // level 1 eigen functions
   matrix[M,S]             efuncs_l2;   // level 2 eigen functions
+  real<lower=0>           prior_sd_scale;
   int<lower=1>            grainsize;
 }
 parameters {
   // matrix[p, S]    beta;             // fixed effect parameter
   matrix[Nsubs, L]   xil1;             // level 1 random effects
   matrix[Nfuns, M]   xil2;             // level 2 random effects
-  // vector<lower=0>[L] sigmal1sq;        // var of the random intercept term
-  // vector<lower=0>[M] sigmal2sq;        // var of the random intercept term
-  // real<lower=0>      sigma_epi_sq;     // var of the error term
-  vector<lower=0>[L] tau1; // precision of level 1 scores
-  vector<lower=0>[M] tau2; // precision of level 2 scores
-  real<lower=0>      taue; // precision for noise
+  vector<lower=0>[L] sigma_l1;         // SD of level 1 scores
+  vector<lower=0>[M] sigma_l2;         // SD of level 2 scores
+  real<lower=0>      sigma_e;           // residual SD
 }
 transformed parameters {
   matrix[Nsubs, L] xil1_sc;            // level 1 random effects
   matrix[Nfuns, M] xil2_sc;            // level 2 random effects
-  // for(l in 1:L){
-  //     xil1_sc[,l] = xil1[,l] * sqrt(sigmal1sq[l]);
-  // }
-  // for(m in 1:M){
-  //     xil2_sc[,m] = xil2[,m] * sqrt(sigmal2sq[m]);
-  // }
   for(l in 1:L){
-      xil1_sc[,l] = xil1[,l] / sqrt(tau1[l]);
+      xil1_sc[,l] = xil1[,l] * sigma_l1[l];
   }
   for(m in 1:M){
-      xil2_sc[,m] = xil2[,m] / sqrt(tau2[m]);
+      xil2_sc[,m] = xil2[,m] * sigma_l2[m];
   }
 }
 model {
@@ -65,12 +57,9 @@ model {
   // priors
   to_vector(xil1) ~ normal(0,1);
   to_vector(xil2) ~ normal(0,1);
-  // sigmal1sq       ~ inv_gamma(0.01, 0.01);
-  // sigmal2sq       ~ inv_gamma(0.01, 0.01);
-  // sigma_epi_sq    ~ inv_gamma(0.01, 0.01);
-  tau1            ~ cauchy(0,1);
-  tau2            ~ cauchy(0,1);
-  taue            ~ cauchy(0,1);
+  sigma_l1        ~ normal(0, prior_sd_scale);
+  sigma_l2        ~ normal(0, prior_sd_scale);
+  sigma_e         ~ normal(0, prior_sd_scale);
 
   eta_mat_i = xil1_sc * efuncs_l1;
   eta_mat_ij = xil2_sc * efuncs_l2;
@@ -85,6 +74,14 @@ model {
   }
   eta_vec = to_vector((eta_mat_ij)')[non_na];
 
-  // target += reduce_sum(partial_sum, y, grainsize, eta_vec, sigma_epi_sq);
-  target += reduce_sum(partial_sum, y, grainsize, eta_vec, taue);
+  target += reduce_sum(partial_sum, y, grainsize, eta_vec, sigma_e);
+}
+generated quantities {
+  // Backward-compatible precision aliases for downstream code.
+  vector[L] tau1;
+  vector[M] tau2;
+  real taue;
+  for (l in 1:L) tau1[l] = inv_square(sigma_l1[l]);
+  for (m in 1:M) tau2[m] = inv_square(sigma_l2[m]);
+  taue = inv_square(sigma_e);
 }

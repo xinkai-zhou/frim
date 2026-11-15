@@ -21,31 +21,24 @@ data {
   // matrix[S, max(nvisits)] mu_j;        // visit specific shift from overall mean, from MFPCA
   matrix[L,S]             efuncs_l1;   // level 1 eigen functions
   matrix[M,S]             efuncs_l2;   // level 2 eigen functions
+  real<lower=0>           prior_sd_scale;
   int<lower=1>            grainsize;
 }
 parameters {
   matrix[Nsubs, L] xil1;   // level 1 random effects
   matrix[Nfuns, M] xil2;   // level 2 random effects
-  vector<lower=0>[L] sigmal1sq; // var of level1 scores
-  vector<lower=0>[M] sigmal2sq; // var of level 2 scores
-  // vector<lower=0>[L] tau1; // precision of level 1 scores
-  // vector<lower=0>[M] tau2; // precision of level 2 scores
+  vector<lower=0>[L] sigma_l1; // SD of level 1 scores
+  vector<lower=0>[M] sigma_l2; // SD of level 2 scores
 }
 transformed parameters {
   matrix[Nsubs, L] xil1_sc;   // level 1 random effects
   matrix[Nfuns, M] xil2_sc;   // level 2 random effects
   for(l in 1:L){
-      xil1_sc[,l] = xil1[,l] * sqrt(sigmal1sq[l]);
+      xil1_sc[,l] = xil1[,l] * sigma_l1[l];
   }
   for(m in 1:M){
-      xil2_sc[,m] = xil2[,m] * sqrt(sigmal2sq[m]);
+      xil2_sc[,m] = xil2[,m] * sigma_l2[m];
   }
-  // for(l in 1:L){
-  //     xil1_sc[,l] = xil1[,l] / sqrt(tau1[l]);
-  // }
-  // for(m in 1:M){
-  //     xil2_sc[,m] = xil2[,m] / sqrt(tau2[m]);
-  // }
 }
 model {
   int inx;
@@ -57,10 +50,8 @@ model {
   // priors
   to_vector(xil1) ~ normal(0,1);
   to_vector(xil2) ~ normal(0,1);
-  sigmal1sq       ~ inv_gamma(0.01, 0.01);
-  sigmal2sq       ~ inv_gamma(0.01, 0.01);
-  // tau1            ~ gamma(1e-6, 1e-6);
-  // tau2            ~ gamma(1e-6, 1e-6);
+  sigma_l1        ~ normal(0, prior_sd_scale);
+  sigma_l2        ~ normal(0, prior_sd_scale);
 
   // New implementation
   eta_mat_i = xil1_sc * efuncs_l1;
@@ -81,4 +72,11 @@ model {
 
   // likelihood
   target += reduce_sum(partial_sum_lpmf, y, grainsize, eta_vec);
+}
+generated quantities {
+  // Backward-compatible variance aliases for downstream code.
+  vector[L] sigmal1sq;
+  vector[M] sigmal2sq;
+  for (l in 1:L) sigmal1sq[l] = square(sigma_l1[l]);
+  for (m in 1:M) sigmal2sq[m] = square(sigma_l2[m]);
 }

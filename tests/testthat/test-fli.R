@@ -8,9 +8,9 @@
 # todo:
 # 1. simulate irregularly spaced functional data and make sure the code works
 
-if(!instantiate::stan_cmdstan_exists()) skip("Tests for fli() skipped because cmdstan is not available.")
+if(!instantiate::stan_cmdstan_exists()) skip("Tests for frim() skipped because cmdstan is not available.")
 
-test_that("fli-gaussian", {
+test_that("frim-gaussian", {
   # cmdstanr::set_cmdstan_path("~/Documents/cmdstan/")
   set.seed(1)
 
@@ -46,7 +46,7 @@ test_that("fli-gaussian", {
     })
 
 
-  fli.res <- fli(
+  frim.res <- frim(
     formula = Y ~ X + (1|id) + (1|id:visit),
     formula.fixef = ~ X,
     data = datm,

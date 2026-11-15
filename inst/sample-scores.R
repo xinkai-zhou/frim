@@ -1,62 +1,8 @@
+# Purpose: execute one split-data FRIM global score sampler.
+# Inputs/outputs are validated and implemented by frim:::.sample_scores_part().
+# Dependencies: installed frim package, instantiate, and CmdStanR/CmdStan.
 
-
-library(tidyverse)
-library(magrittr)
-library(cmdstanr)
-
-args <- commandArgs(trailingOnly = TRUE)
-
-ParseArgs <- function(args) {
-  args_list <- list()
-  for (arg in args) {
-    key_value <- strsplit(arg, "=")[[1]]
-    if (length(key_value) == 2) {
-      key <- key_value[1]
-      value <- key_value[2]
-      args_list[[key]] <- value
-    }
-  }
-  return(args_list)
-}
-args.parsed <- ParseArgs(args)
-print(str(args.parsed))
-
-# subset index
-sidx <- as.integer(args.parsed$sidx)
-# path to standata
-standata.path <- args.parsed$standata_path
-family <- args.parsed$family
-
-standatafile <- paste0(standata.path, "standata-part", sidx, ".json")
-stanmodel <- instantiate::stan_package_model(
-  name = paste0("stanmodel-", family), package = "FRIM"
-)
-tic <- Sys.time()
-stanfit <- stanmodel$sample(
-  # data = paste0(res.path, "standata.json"),
-  data = standatafile,
-  iter_warmup =  as.integer(args.parsed$iter_warmup),
-  iter_sampling =  as.integer(args.parsed$iter_sampling),
-  chains =  as.integer(args.parsed$chains),
-  parallel_chains =  as.integer(args.parsed$num_cores),
-  refresh =  as.integer(args.parsed$refresh)
-)
-toc <- Sys.time()
-
-dtime <- data.frame(
-  runtime = difftime(time1 = toc, time2 = tic, units = "secs"),
-  split_idx = sidx,
-  step = "step4"
-)
-write.table(
-  dtime, file = paste0(standata.path, "runtime.csv"),
-  quote = F, sep = ",", append = T, row.names = F, col.names = F
-)
-
-saveRDS(stanfit, file = paste0(standata.path, "stanfit-part", sidx, ".rds"))
-
-draws.df <- stanfit$draws(format = "df")
-saveRDS(draws.df, file = paste0(standata.path, "draws-part", sidx, ".rds"))
+frim:::.sample_scores_part(commandArgs(trailingOnly = TRUE))
 
 # # stanfit.summary <- stanfit$summary()
 # # rhat.val <- stanfit.summary$rhat

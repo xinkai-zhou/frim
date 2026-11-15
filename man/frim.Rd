@@ -14,7 +14,13 @@ frim(
   var.names = list(id_name = "id", visit_name = "visit", domain_name = "time"),
   smoothing.pars = list(nknots_min = 35, smooth_method = "GCV.Cp", splines = "tp"),
   mfpca.pars = list(pve = 0.99, npc_l1 = 4, npc_l2 = 4, visit.levels = NULL, twoway = F),
-  stan.pars = list(iter_warmup = 1000, iter_sampling = 2000, chains = 4, refresh = 100),
+  stan.pars = list(
+    iter_warmup = 1000,
+    iter_sampling = 2000,
+    chains = 4,
+    refresh = 100,
+    prior_sd_scale = 1
+  ),
   dir.path = list(save_intermediate_res = FALSE, intermediate_res_path = "results/sim/"),
   ci.level = 0.95,
   parallel = TRUE,
@@ -61,7 +67,10 @@ Defaults to \code{NULL}, which then uses L/2 where L is the dimension of the fun
 \code{iter_warmup}: number of warmup iterations. Defaults to \code{1000}.
 \code{iter_sampling}: number of sampling iterations. Defaults to \code{2000}.
 \code{chains}: number of chains. Defaults to \code{4}.
-\code{refresh}: number of iterations between progress updates. Defaults to \code{100}.}
+\code{refresh}: number of iterations between progress updates. Defaults to \code{100}.
+\code{prior_sd_scale}: shared scale of the half-normal priors on level-1
+score SDs, level-2 score SDs, and the Gaussian residual SD. Must be one
+finite value greater than zero. Defaults to \code{1}.}
 
 \item{dir.path}{A named list with components:
 \code{save_intermediate_res}: logical, indicating whether to save intermediate results. Defaults to \code{FALSE}.
